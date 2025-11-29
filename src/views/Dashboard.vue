@@ -3,6 +3,8 @@ import { onMounted, computed, ref } from 'vue';
 import { useEmployeeStore } from '../stores/employeeStore';
 import Card from 'primevue/card';
 import Chart from 'primevue/chart';
+import Avatar from 'primevue/avatar';
+import Tag from 'primevue/tag';
 
 const store = useEmployeeStore();
 
@@ -22,6 +24,11 @@ const presentToday = computed(() => {
 const onLeaveToday = computed(() => {
     const today = 1;
     return store.filteredEmployees.filter(e => e.attendance[today]?.status === 'Leave').length;
+});
+
+const presentEmployeesList = computed(() => {
+    const today = 1;
+    return store.filteredEmployees.filter(e => e.attendance[today]?.status === 'Present');
 });
 
 const chartData = computed(() => {
@@ -79,12 +86,33 @@ const chartOptions = ref({
         </div>
 
         <div class="col-12 lg:col-6 animation-duration-500 animation-ease-out fadeinup" style="animation-delay: 0.3s">
-            <Card>
+            <Card class="h-full">
                 <template #title>Attendance Overview</template>
                 <template #content>
-                    <div class="flex justify-content-center">
-                        <Chart type="doughnut" :data="chartData" :options="chartOptions" class="w-full" style="max-width: 30rem" />
+                    <div class="flex justify-content-center h-20rem">
+                        <Chart type="doughnut" :data="chartData" :options="chartOptions" class="w-full h-full" />
                     </div>
+                </template>
+            </Card>
+        </div>
+
+        <div class="col-12 lg:col-6 animation-duration-500 animation-ease-out fadeinup" style="animation-delay: 0.4s">
+            <Card class="h-full">
+                <template #title>Today's Attendance</template>
+                <template #content>
+                    <ul class="list-none p-0 m-0 overflow-y-auto" style="max-height: 20rem">
+                        <li v-for="employee in presentEmployeesList" :key="employee.id" class="flex align-items-center py-3 border-bottom-1 surface-border">
+                            <Avatar :label="employee.name.charAt(0)" shape="circle" class="mr-3 bg-green-100 text-green-700 font-bold" />
+                            <div class="flex-1">
+                                <div class="font-bold mb-1">{{ employee.name }}</div>
+                                <div class="text-sm text-600">{{ employee.role }}</div>
+                            </div>
+                            <div class="flex align-items-center text-700">
+                                <i class="pi pi-clock mr-2 text-primary"></i>
+                                <span class="font-medium">{{ employee.attendance[1].inTime }}</span>
+                            </div>
+                        </li>
+                    </ul>
                 </template>
             </Card>
         </div>

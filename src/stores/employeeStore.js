@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { db } from '../firebaseConfig';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { employeesData } from '../data/employees';
 
 export const useEmployeeStore = defineStore('employee', () => {
     const employees = ref([]);
@@ -18,20 +19,21 @@ export const useEmployeeStore = defineStore('employee', () => {
         );
     });
 
-    // Mock Data Generator
+    // Load employee data from employees.js
     const generateEmployees = async () => {
         if (employees.value.length > 0) return; // Already loaded
 
         loading.value = true;
         const newEmployees = [];
 
-        for (let i = 1; i <= 100; i++) {
+        // Use actual employee data instead of mock names
+        for (const empData of employeesData) {
             const attendance = generateRandomAttendance();
             newEmployees.push({
-                id: i,
-                name: `Employee ${i}`,
-                role: ['Developer', 'Designer', 'Manager', 'HR'][Math.floor(Math.random() * 4)],
-                baseSalary: Math.floor(Math.random() * 5000) + 3000,
+                id: empData.id,
+                name: empData.name,
+                role: empData.role,
+                baseSalary: empData.baseSalary,
                 attendance: attendance,
                 leaves: [] // Array of dates
             });

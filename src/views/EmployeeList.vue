@@ -7,6 +7,7 @@ import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Calendar from 'primevue/calendar';
 import Tag from 'primevue/tag';
+import Avatar from 'primevue/avatar';
 import { useToast } from 'primevue/usetoast';
 import Toast from 'primevue/toast';
 
@@ -47,15 +48,28 @@ const getSalaryDetails = (employee) => {
 </script>
 
 <template>
-    <div class="card">
+    <div class="mb-4">
+        <h2 class="text-3xl font-bold text-800 mb-1">Employee Management</h2>
+        <p class="text-600">Manage employee information and track their performance</p>
+    </div>
+
+    <div class="card glass border-0 shadow-none">
         <Toast />
-        <h2 class="mb-4">Employee Management</h2>
         
         <div class="overflow-x-auto">
             <DataTable :value="store.filteredEmployees" paginator :rows="20" :rowsPerPageOptions="[10, 20, 50]" tableStyle="min-width: 50rem">
                 <Column field="id" header="ID" sortable></Column>
-                <Column field="name" header="Name" sortable></Column>
-                <Column field="role" header="Role" sortable></Column>
+                <Column field="name" header="Employee" sortable>
+                    <template #body="slotProps">
+                        <div class="flex align-items-center gap-3">
+                            <Avatar :label="slotProps.data.name.charAt(0)" shape="circle" size="large" class="bg-blue-100 text-blue-700 font-bold" />
+                            <div class="flex flex-column">
+                                <span class="font-bold text-lg">{{ slotProps.data.name }}</span>
+                                <span class="text-sm text-500">{{ slotProps.data.role }}</span>
+                            </div>
+                        </div>
+                    </template>
+                </Column>
                 <Column header="Salary Info">
                     <template #body="slotProps">
                         <div class="flex flex-column">
