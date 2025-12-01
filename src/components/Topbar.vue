@@ -45,7 +45,7 @@ const toggleMenu = (event) => {
     <div class="topbar-container px-4 pt-3 pb-0">
         <div class="glass w-full p-3 border-round-2xl shadow-2 flex justify-content-between align-items-center">
             <!-- Search -->
-            <div class="flex align-items-center w-full md:w-4 gap-2">
+            <div class="flex align-items-center flex-1 md:flex-none md:w-4 gap-2">
                 <Button icon="pi pi-bars" text rounded class="lg:hidden text-600" @click="$emit('menu-toggle')" />
                 <span class="p-input-icon-left w-full relative">
                     <i class="pi pi-search text-500 absolute" style="top: 50%; transform: translateY(-50%); left: 0.75rem; z-index: 1;"></i>
@@ -66,7 +66,6 @@ const toggleMenu = (event) => {
                         <span class="text-sm font-bold text-800">Admin User</span>
                         <span class="text-xs text-500">Super Admin</span>
                     </div>
-                    <i class="pi pi-angle-down ml-2 text-500 text-xs"></i>
                 </div>
                 <Menu ref="menu" id="overlay_menu" :model="items" :popup="true" class="glass-menu" />
             </div>
