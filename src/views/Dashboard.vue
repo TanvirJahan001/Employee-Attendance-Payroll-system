@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, computed, ref } from 'vue';
 import { useEmployeeStore } from '../stores/employeeStore';
+import { ATTENDANCE_STATUS } from '../constants';
 import Card from 'primevue/card';
 import Chart from 'primevue/chart';
 import Avatar from 'primevue/avatar';
@@ -14,21 +15,34 @@ onMounted(async () => {
 
 const totalEmployees = computed(() => store.filteredEmployees.length);
 
-const presentToday = computed(() => {
-    // Simplified: check day 1 for demo or random day
-    // In real app, check today's date
-    const today = 1; 
-    return store.filteredEmployees.filter(e => e.attendance[today]?.status === 'Present').length;
+const todayStats = computed(() => {
+    const today = 1; // Simplified for demo
+    let present = 0;
+    let leave = 0;
+    
+    // Single pass through the array for O(n) complexity
+    store.filteredEmployees.forEach(e => {
+        const status = e.attendance[today]?.status;
+        if (status === ATTENDANCE_STATUS.PRESENT) {
+            present++;
+        } else if (status === ATTENDANCE_STATUS.LEAVE) {
+            leave++;
+        }
+    });
+
+    return {
+        present,
+        leave,
+        absent: totalEmployees.value - present - leave
+    };
 });
 
-const onLeaveToday = computed(() => {
-    const today = 1;
-    return store.filteredEmployees.filter(e => e.attendance[today]?.status === 'Leave').length;
-});
+const presentToday = computed(() => todayStats.value.present);
+const onLeaveToday = computed(() => todayStats.value.leave);
 
 const presentEmployeesList = computed(() => {
     const today = 1;
-    return store.filteredEmployees.filter(e => e.attendance[today]?.status === 'Present');
+    return store.filteredEmployees.filter(e => e.attendance[today]?.status === ATTENDANCE_STATUS.PRESENT);
 });
 
 const chartData = computed(() => {
@@ -36,7 +50,7 @@ const chartData = computed(() => {
         labels: ['Present', 'Absent', 'Leave'],
         datasets: [
             {
-                data: [presentToday.value, totalEmployees.value - presentToday.value - onLeaveToday.value, onLeaveToday.value],
+                data: [todayStats.value.present, todayStats.value.absent, todayStats.value.leave],
                 backgroundColor: ['#4CAF50', '#FF5252', '#FFC107'],
                 hoverBackgroundColor: ['#66BB6A', '#FF8A80', '#FFD54F']
             }

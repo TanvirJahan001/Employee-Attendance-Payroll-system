@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { db } from '../firebaseConfig';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { employeesData } from '../data/employees';
+import { ATTENDANCE_STATUS } from '../constants';
 
 export const useEmployeeStore = defineStore('employee', () => {
     const employees = ref([]);
@@ -64,13 +65,13 @@ export const useEmployeeStore = defineStore('employee', () => {
                 const endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
 
                 attendance[day] = {
-                    status: 'Present',
+                    status: ATTENDANCE_STATUS.PRESENT,
                     inTime: startTime,
                     outTime: endTime
                 };
             } else {
                 attendance[day] = {
-                    status: 'Absent',
+                    status: ATTENDANCE_STATUS.ABSENT,
                     inTime: null,
                     outTime: null
                 };
@@ -86,7 +87,7 @@ export const useEmployeeStore = defineStore('employee', () => {
                 emp.leaves.push(day);
                 // Update attendance status for that day
                 if (emp.attendance[day]) {
-                    emp.attendance[day].status = 'Leave';
+                    emp.attendance[day].status = ATTENDANCE_STATUS.LEAVE;
                 }
             }
         }
@@ -99,7 +100,7 @@ export const useEmployeeStore = defineStore('employee', () => {
         for (let day = 1; day <= currentMonthDays; day++) {
             const record = employee.attendance[day];
             // Check if absent AND not on leave
-            if (record.status === 'Absent' && !employee.leaves.includes(day)) {
+            if (record.status === ATTENDANCE_STATUS.ABSENT && !employee.leaves.includes(day)) {
                 absentDays++;
             }
         }
