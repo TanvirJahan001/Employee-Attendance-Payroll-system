@@ -48,6 +48,12 @@ const router = createRouter({
                     name: 'payroll',
                     component: () => import('../views/Payroll.vue'),
                     meta: { requiresAuth: true, requiresAdmin: true }
+                },
+                {
+                    path: 'checkin',
+                    name: 'checkin',
+                    component: () => import('../views/CheckIn.vue'),
+                    meta: { requiresAuth: true }
                 }
             ]
         },

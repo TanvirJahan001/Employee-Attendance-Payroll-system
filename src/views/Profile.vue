@@ -2,7 +2,8 @@
 import { ref, computed } from 'vue';
 import { getAuth, updateProfile } from "firebase/auth";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebaseConfig';
 import { useAuthStore } from '../stores/authStore';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -21,9 +22,11 @@ const profile = ref({
     bio: '',
 });
 
+const avatarUrl = ref('');
 const nameError = ref('');
 const phoneError = ref('');
 const saving = ref(false);
+const uploadingAvatar = ref(false);
 
 // Load profile from Firestore on mount
 const loadProfile = async () => {
@@ -31,6 +34,7 @@ const loadProfile = async () => {
     if (!user) return;
 
     profile.value.name = user.displayName || '';
+    avatarUrl.value = user.photoURL || '';
 
     try {
         const snap = await getDoc(doc(db, 'users', user.uid));
@@ -39,6 +43,7 @@ const loadProfile = async () => {
             profile.value.phone = data.phone || '';
             profile.value.location = data.location || '';
             profile.value.bio = data.bio || '';
+            if (data.avatarUrl) avatarUrl.value = data.avatarUrl;
         }
     } catch {
         // Non-critical; proceed with defaults
@@ -93,14 +98,16 @@ const saveProfile = async () => {
 
     saving.value = true;
     try {
-        // Update Firebase display name
-        await updateProfile(user, { displayName: profile.value.name.trim() });
+        await updateProfile(user, {
+            displayName: profile.value.name.trim(),
+            photoURL: avatarUrl.value || null,
+        });
 
-        // Persist extra fields to Firestore (not sensitive business data)
         await setDoc(doc(db, 'users', user.uid), {
             phone: profile.value.phone.trim(),
             location: profile.value.location.trim(),
             bio: profile.value.bio.trim().substring(0, MAX_BIO_LENGTH),
+            avatarUrl: avatarUrl.value || '',
         }, { merge: true });
 
         toast.add({ severity: 'success', summary: 'Saved', detail: 'Profile updated successfully.', life: 3000 });
@@ -111,7 +118,9 @@ const saveProfile = async () => {
     }
 };
 
-const onUpload = (event) => {
+// ── Avatar Upload to Firebase Storage ───────────────────────────────────────
+
+const onUpload = async (event) => {
     const file = event.files?.[0];
     if (!file) return;
 
@@ -126,7 +135,30 @@ const onUpload = (event) => {
         toast.add({ severity: 'error', summary: 'File too large', detail: 'Maximum file size is 2 MB.', life: 3000 });
         return;
     }
-    toast.add({ severity: 'info', summary: 'Info', detail: 'Avatar upload requires storage configuration.', life: 3000 });
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    uploadingAvatar.value = true;
+    try {
+        // Store avatar under avatars/{uid}/avatar.{ext}
+        const ext = file.name.split('.').pop().toLowerCase();
+        const fileRef = storageRef(storage, `avatars/${user.uid}/avatar.${ext}`);
+        await uploadBytes(fileRef, file);
+        const downloadUrl = await getDownloadURL(fileRef);
+
+        // Persist to Firebase Auth and Firestore
+        avatarUrl.value = downloadUrl;
+        await updateProfile(user, { photoURL: downloadUrl });
+        await setDoc(doc(db, 'users', user.uid), { avatarUrl: downloadUrl }, { merge: true });
+
+        toast.add({ severity: 'success', summary: 'Avatar Updated', detail: 'Your profile photo has been saved.', life: 3000 });
+    } catch (err) {
+        console.error('[Profile] avatar upload error', err);
+        toast.add({ severity: 'error', summary: 'Upload Failed', detail: 'Could not upload photo. Please try again.', life: 3000 });
+    } finally {
+        uploadingAvatar.value = false;
+    }
 };
 </script>
 
@@ -138,23 +170,32 @@ const onUpload = (event) => {
         <div class="col-12 md:col-4">
             <div class="glass p-4 h-full flex flex-column align-items-center text-center">
                 <div class="relative mb-4">
-                    <!-- Initials avatar — no external service -->
+                    <!-- Show real avatar if available, otherwise initials -->
                     <Avatar
+                        v-if="avatarUrl"
+                        :image="avatarUrl"
+                        class="w-8rem h-8rem shadow-4"
+                        style="object-fit:cover;"
+                        shape="circle"
+                    />
+                    <Avatar
+                        v-else
                         :label="authStore.userInitials"
                         class="w-8rem h-8rem shadow-4 text-4xl font-bold"
                         style="background-color: var(--primary-500); color: #fff;"
                         shape="circle"
                     />
+                    <!-- Upload button -->
                     <Button
                         icon="pi pi-camera"
                         rounded
                         severity="secondary"
                         class="absolute bottom-0 right-0 shadow-2"
                         style="width: 2.5rem; height: 2.5rem;"
+                        :loading="uploadingAvatar"
                         @click="$refs.fileInput.click()"
                         title="Change avatar"
                     />
-                    <!-- Hidden file input with strict restrictions -->
                     <input
                         ref="fileInput"
                         type="file"
@@ -199,7 +240,6 @@ const onUpload = (event) => {
                     </div>
                     <div class="field col-12 md:col-6 mb-4">
                         <label for="email" class="font-medium text-700">Email Address</label>
-                        <!-- Email is read-only; change requires re-auth via Firebase -->
                         <InputText id="email" :value="userEmail" class="bg-white-alpha-50" disabled />
                     </div>
                     <div class="field col-12 md:col-6 mb-4">

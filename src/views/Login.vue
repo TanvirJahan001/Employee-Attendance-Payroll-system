@@ -1,13 +1,14 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useToast } from "primevue/usetoast";
 import { useAuthStore } from '../stores/authStore';
 import Toast from 'primevue/toast';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
+import Dialog from 'primevue/dialog';
 
 const email = ref('');
 const password = ref('');
@@ -18,6 +19,12 @@ const router = useRouter();
 const toast = useToast();
 const auth = getAuth();
 const authStore = useAuthStore();
+
+// Forgot password state
+const forgotDialogVisible = ref(false);
+const forgotEmail = ref('');
+const forgotEmailError = ref('');
+const forgotLoading = ref(false);
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -54,7 +61,6 @@ const handleLogin = async () => {
         await authStore.recordLoginEvent(credential.user.uid, true);
         router.push('/dashboard');
     } catch (error) {
-        // Record failed attempt without exposing internal error details
         const knownErrors = {
             'auth/user-not-found': 'Invalid email or password.',
             'auth/wrong-password': 'Invalid email or password.',
@@ -69,6 +75,49 @@ const handleLogin = async () => {
         loading.value = false;
     }
 };
+
+// ── Forgot Password ──────────────────────────────────────────────────────────
+
+const openForgotDialog = () => {
+    forgotEmail.value = email.value; // pre-fill if user already typed email
+    forgotEmailError.value = '';
+    forgotDialogVisible.value = true;
+};
+
+const handleForgotPassword = async () => {
+    forgotEmailError.value = '';
+    if (!forgotEmail.value.trim()) {
+        forgotEmailError.value = 'Email is required.';
+        return;
+    }
+    if (!EMAIL_REGEX.test(forgotEmail.value.trim())) {
+        forgotEmailError.value = 'Enter a valid email address.';
+        return;
+    }
+
+    forgotLoading.value = true;
+    try {
+        await sendPasswordResetEmail(auth, forgotEmail.value.trim());
+        toast.add({
+            severity: 'success',
+            summary: 'Email Sent',
+            detail: `A password reset link has been sent to ${forgotEmail.value.trim()}. Check your inbox.`,
+            life: 6000,
+        });
+        forgotDialogVisible.value = false;
+        forgotEmail.value = '';
+    } catch (error) {
+        const knownErrors = {
+            'auth/user-not-found': 'No account found with this email address.',
+            'auth/invalid-email': 'Invalid email address.',
+            'auth/too-many-requests': 'Too many requests. Please try again later.',
+            'auth/network-request-failed': 'Network error. Please check your connection.',
+        };
+        forgotEmailError.value = knownErrors[error.code] || 'Failed to send reset email. Please try again.';
+    } finally {
+        forgotLoading.value = false;
+    }
+};
 </script>
 
 <template>
@@ -76,12 +125,12 @@ const handleLogin = async () => {
         <Toast />
 
         <div class="glass p-4 md:p-6 w-full max-w-30rem border-round-2xl relative overflow-hidden">
-            <!-- Decorative circle inside card -->
+            <!-- Decorative circles -->
             <div class="absolute top-0 right-0 w-10rem h-10rem bg-primary-400 border-circle opacity-20 blur-3xl" style="transform: translate(30%, -30%)"></div>
             <div class="absolute bottom-0 left-0 w-8rem h-8rem bg-pink-400 border-circle opacity-20 blur-3xl" style="transform: translate(-30%, 30%)"></div>
 
             <div class="text-center mb-5 relative z-1">
-                <div class="text-4xl font-bold text-900 mb-2">Employee Attendance & Payroll system</div>
+                <div class="text-4xl font-bold text-900 mb-2">Employee Attendance &amp; Payroll System</div>
                 <div class="text-700">Welcome back! Please login to continue.</div>
             </div>
 
@@ -123,13 +172,52 @@ const handleLogin = async () => {
                 <Button label="Sign In" type="submit" class="w-full p-3 text-lg font-bold shadow-4 hover:shadow-6 transition-all" :loading="loading" rounded />
 
                 <div class="text-center mt-4">
-                    <span class="text-primary-600 font-medium">Forgot Password? Contact Admin</span>
+                    <a
+                        href="#"
+                        class="text-primary-600 font-medium no-underline hover:underline cursor-pointer"
+                        @click.prevent="openForgotDialog"
+                    >
+                        Forgot Password?
+                    </a>
                 </div>
             </form>
         </div>
+
+        <!-- ── Forgot Password Dialog ───────────────────────────────────────── -->
+        <Dialog
+            v-model:visible="forgotDialogVisible"
+            modal
+            header="Reset Your Password"
+            :style="{ width: '26rem' }"
+            :breakpoints="{ '640px': '90vw' }"
+        >
+            <p class="text-600 mb-4">
+                Enter your email address and we'll send you a link to reset your password.
+            </p>
+            <div class="field mb-4">
+                <label for="forgotEmail" class="block font-medium mb-2">Email Address</label>
+                <span class="p-input-icon-left w-full">
+                    <i class="pi pi-envelope"></i>
+                    <InputText
+                        id="forgotEmail"
+                        v-model="forgotEmail"
+                        type="email"
+                        placeholder="your@email.com"
+                        class="w-full"
+                        :class="{ 'p-invalid': forgotEmailError }"
+                        @keyup.enter="handleForgotPassword"
+                    />
+                </span>
+                <small v-if="forgotEmailError" class="p-error">{{ forgotEmailError }}</small>
+            </div>
+            <div class="flex justify-content-end gap-2">
+                <Button label="Cancel" severity="secondary" text @click="forgotDialogVisible = false" />
+                <Button label="Send Reset Link" icon="pi pi-send" :loading="forgotLoading" @click="handleForgotPassword" />
+            </div>
+        </Dialog>
     </div>
 </template>
 
 <style scoped>
-/* Scoped styles if needed, but mostly using global classes now */
+/* Scoped styles if needed */
 </style>
