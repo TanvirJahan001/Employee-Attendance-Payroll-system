@@ -1,13 +1,11 @@
 <script setup>
-import { onMounted, computed, ref } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { ATTENDANCE_STATUS } from '../constants';
 import Card from 'primevue/card';
 import Chart from 'primevue/chart';
 import Avatar from 'primevue/avatar';
-// Register Chart.js here (not globally) so it's lazy-loaded with this route only
-import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement } from 'chart.js';
-ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
+import { ref } from 'vue';
 
 const store = useEmployeeStore();
 
