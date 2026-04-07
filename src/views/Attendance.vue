@@ -1,27 +1,23 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useEmployeeStore } from '../stores/employeeStore';
-import { ATTENDANCE_STATUS } from '../constants';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Calendar from 'primevue/calendar';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import Avatar from 'primevue/avatar';
-import Toast from 'primevue/toast';
-import { useToast } from 'primevue/usetoast';
 
 const store = useEmployeeStore();
-const toast = useToast();
-const markingLeave = ref(null); // tracks which employee row is loading
+const selectedDate = ref(new Date()); // Default to today
+// Ensure we default to a valid day in our mock range (1-30) if today is > 30
+if (selectedDate.value.getDate() > 30) {
+    selectedDate.value.setDate(1);
+}
 
-const selectedDate = ref(new Date());
-
-// Clamp selected day to valid range for the current month's data
+// Derived day number for store lookup (1-30)
 const selectedDay = computed(() => {
-    if (!selectedDate.value) return 1;
-    const day = selectedDate.value.getDate();
-    return Math.min(day, store.currentMonthDays);
+    return selectedDate.value ? selectedDate.value.getDate() : 1;
 });
 
 onMounted(async () => {
@@ -30,23 +26,19 @@ onMounted(async () => {
 
 const getSeverity = (status) => {
     switch (status) {
-        case ATTENDANCE_STATUS.PRESENT: return 'success';
-        case ATTENDANCE_STATUS.ABSENT:  return 'danger';
-        case ATTENDANCE_STATUS.LEAVE:   return 'warning';
-        default:                         return 'info';
+        case 'Present':
+            return 'success';
+        case 'Absent':
+            return 'danger';
+        case 'Leave':
+            return 'warning';
+        default:
+            return 'info';
     }
-};
-
-const handleMarkLeave = async (employee) => {
-    markingLeave.value = employee.id;
-    await store.markLeave(employee.id, selectedDay.value);
-    toast.add({ severity: 'success', summary: 'Leave Marked', detail: `${employee.name} marked as on leave.`, life: 3000 });
-    markingLeave.value = null;
 };
 </script>
 
 <template>
-    <Toast />
     <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center mb-4 gap-3">
         <div>
             <h2 class="text-3xl font-bold text-800 mb-1">Attendance</h2>
@@ -59,15 +51,16 @@ const handleMarkLeave = async (employee) => {
     </div>
 
     <div class="card glass border-0 shadow-none">
+
         <div class="overflow-x-auto">
-            <DataTable :value="store.filteredEmployees" :loading="store.loading" paginator :rows="10"
+            <DataTable :value="store.filteredEmployees" :loading="store.loading" paginator :rows="10" 
                 tableStyle="min-width: 50rem"
                 class="p-datatable-lg"
                 rowHover>
                 <Column field="name" header="Employee">
                     <template #body="slotProps">
                         <div class="flex align-items-center gap-3">
-                            <Avatar :label="slotProps.data.name.charAt(0)" shape="circle" size="large"
+                            <Avatar :label="slotProps.data.name.charAt(0)" shape="circle" size="large" 
                                 class="bg-primary-100 text-primary-700 font-bold" />
                             <div class="flex flex-column">
                                 <span class="font-bold text-lg">{{ slotProps.data.name }}</span>
@@ -76,49 +69,43 @@ const handleMarkLeave = async (employee) => {
                         </div>
                     </template>
                 </Column>
-
+                
                 <Column header="Status">
                     <template #body="slotProps">
-                        <Tag
-                            :value="slotProps.data.attendance[selectedDay]?.status || 'Unknown'"
+                        <Tag :value="slotProps.data.attendance[selectedDay]?.status || 'Unknown'" 
                             :severity="getSeverity(slotProps.data.attendance[selectedDay]?.status)"
-                            class="px-3 py-2 text-sm uppercase"
-                            rounded
-                        />
+                            class="px-3 py-2 text-sm uppercase" 
+                            rounded />
                     </template>
                 </Column>
-
+    
                 <Column header="Check In">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.attendance[selectedDay]?.inTime" class="flex align-items-center gap-2 text-700">
                             <i class="pi pi-clock text-primary"></i>
-                            <span class="font-mono">{{ slotProps.data.attendance[selectedDay].inTime }}</span>
+                            <span class="font-mono">{{ slotProps.data.attendance[selectedDay]?.inTime }}</span>
                         </div>
                         <span v-else class="text-400">-</span>
                     </template>
                 </Column>
-
+    
                 <Column header="Check Out">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.attendance[selectedDay]?.outTime" class="flex align-items-center gap-2 text-700">
                             <i class="pi pi-clock text-orange-500"></i>
-                            <span class="font-mono">{{ slotProps.data.attendance[selectedDay].outTime }}</span>
+                            <span class="font-mono">{{ slotProps.data.attendance[selectedDay]?.outTime }}</span>
                         </div>
                         <span v-else class="text-400">-</span>
                     </template>
                 </Column>
-
+                
                 <Column header="Actions">
                     <template #body="slotProps">
-                        <Button
-                            v-if="slotProps.data.attendance[selectedDay]?.status === ATTENDANCE_STATUS.ABSENT"
-                            icon="pi pi-calendar-plus"
-                            label="Mark Leave"
-                            text
-                            severity="warning"
-                            :loading="markingLeave === slotProps.data.id"
-                            @click="handleMarkLeave(slotProps.data)"
-                        />
+                         <Button v-if="slotProps.data.attendance[selectedDay]?.status === 'Absent'" 
+                            icon="pi pi-calendar-plus" 
+                            label="Mark Leave" 
+                            text severity="warning" 
+                            @click="store.markLeave(slotProps.data.id, selectedDay)" />
                     </template>
                 </Column>
             </DataTable>

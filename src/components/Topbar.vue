@@ -1,5 +1,4 @@
 <script setup>
-import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getAuth, signOut } from "firebase/auth";
 import { useEmployeeStore } from '../stores/employeeStore';
@@ -7,25 +6,15 @@ import { useAuthStore } from '../stores/authStore';
 import Button from 'primevue/button';
 import Avatar from 'primevue/avatar';
 import Menu from 'primevue/menu';
-import OverlayPanel from 'primevue/overlaypanel';
 import InputText from 'primevue/inputtext';
+import Badge from 'primevue/badge';
+import { ref } from 'vue';
 
 const router = useRouter();
 const auth = getAuth();
 const employeeStore = useEmployeeStore();
 const authStore = useAuthStore();
 const menu = ref();
-const notificationPanel = ref();
-
-// Sample notifications — in a real app, load from Firestore
-const notifications = ref([
-    { id: 1, icon: 'pi-calendar-plus', color: 'text-orange-500', message: 'Leave request pending approval', time: 'Just now' },
-    { id: 2, icon: 'pi-user-plus', color: 'text-blue-500', message: 'New employee added to the system', time: '1 hour ago' },
-]);
-
-const toggleNotifications = (event) => {
-    notificationPanel.value.toggle(event);
-};
 
 const items = ref([
     {
@@ -71,37 +60,7 @@ const toggleMenu = (event) => {
 
             <!-- Actions -->
             <div class="flex align-items-center gap-3">
-                <!-- Bell button now opens a notification overlay -->
-                <Button
-                    icon="pi pi-bell"
-                    text
-                    rounded
-                    severity="secondary"
-                    v-badge.danger="notifications.length"
-                    class="text-600 hover:text-900 hover:bg-white-alpha-50"
-                    @click="toggleNotifications"
-                    aria-label="Notifications"
-                />
-                <OverlayPanel ref="notificationPanel" class="w-20rem">
-                    <div class="font-bold text-900 mb-3 pb-2 border-bottom-1 surface-border">Notifications</div>
-                    <ul class="list-none m-0 p-0">
-                        <li
-                            v-for="n in notifications"
-                            :key="n.id"
-                            class="flex align-items-start gap-3 py-2 border-bottom-1 surface-border last:border-none"
-                        >
-                            <i :class="['pi', n.icon, n.color, 'mt-1 text-lg']"></i>
-                            <div class="flex-1">
-                                <div class="text-800 text-sm">{{ n.message }}</div>
-                                <div class="text-400 text-xs mt-1">{{ n.time }}</div>
-                            </div>
-                        </li>
-                        <li v-if="notifications.length === 0" class="text-500 text-sm text-center py-3">
-                            No new notifications
-                        </li>
-                    </ul>
-                </OverlayPanel>
-
+                <Button icon="pi pi-bell" text rounded severity="secondary" v-badge.danger="2" class="text-600 hover:text-900 hover:bg-white-alpha-50" />
                 <Button icon="pi pi-cog" text rounded severity="secondary" class="text-600 hover:text-900 hover:bg-white-alpha-50" @click="router.push('/settings')" />
 
                 <div class="h-2rem w-1px bg-gray-300 mx-1"></div>

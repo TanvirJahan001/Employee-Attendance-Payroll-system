@@ -10,10 +10,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     const employees = ref([]);
     const loading = ref(false);
     const searchQuery = ref('');
-
-    // Actual days in the current month (e.g. 28, 29, 30, or 31)
-    const now = new Date();
-    const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentMonthDays = 30;
 
     const filteredEmployees = computed(() => {
         if (!searchQuery.value) return employees.value;
@@ -149,7 +146,6 @@ export const useEmployeeStore = defineStore('employee', () => {
     return {
         employees,
         loading,
-        currentMonthDays,
         generateEmployees,
         markLeave,
         calculateSalary,

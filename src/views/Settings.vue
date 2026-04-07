@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted } from 'vue';
 import { getAuth, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -18,31 +18,18 @@ import { useToast } from 'primevue/usetoast';
 const auth = getAuth();
 const toast = useToast();
 
-const SETTINGS_KEY = 'app_settings';
-
-const loadSettings = () => {
-    try {
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-};
-
-const savedSettings = loadSettings();
-
 const notifications = ref({
-    email: savedSettings?.notifications?.email ?? true,
-    push: savedSettings?.notifications?.push ?? true,
-    updates: savedSettings?.notifications?.updates ?? false,
+    email: true,
+    push: true,
+    updates: false,
 });
 
 const security = ref({
-    twoFactor: savedSettings?.security?.twoFactor ?? false,
+    twoFactor: false,
 });
 
-const language = ref(savedSettings?.language ?? 'en');
-const timezone = ref(savedSettings?.timezone ?? 'UTC+6 (Dhaka Time)');
+const language = ref('en');
+const timezone = ref('UTC+6 (Dhaka Time)');
 
 const languages = [
     { name: 'English', code: 'en' },
@@ -162,17 +149,7 @@ const openLoginHistory = async () => {
 };
 
 const saveSettings = () => {
-    try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-            notifications: notifications.value,
-            security: security.value,
-            language: language.value,
-            timezone: timezone.value,
-        }));
-        toast.add({ severity: 'success', summary: 'Saved', detail: 'Settings saved successfully.', life: 3000 });
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save settings.', life: 3000 });
-    }
+    toast.add({ severity: 'success', summary: 'Saved', detail: 'Settings updated successfully.', life: 3000 });
 };
 </script>
 

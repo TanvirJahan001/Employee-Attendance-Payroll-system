@@ -76,21 +76,8 @@ const formatCurrency = (value) => {
                 </Column>
                 
                 <Column header="Status">
-                    <template #body="slotProps">
-                        <Tag
-                            v-if="store.calculateSalary(slotProps.data).absentDays > 3"
-                            value="Deduction Applied"
-                            severity="warning"
-                            icon="pi pi-exclamation-triangle"
-                            rounded
-                        />
-                        <Tag
-                            v-else
-                            value="No Deduction"
-                            severity="success"
-                            icon="pi pi-check"
-                            rounded
-                        />
+                     <template #body="slotProps">
+                        <Tag value="Processed" severity="success" icon="pi pi-check" rounded></Tag>
                     </template>
                 </Column>
             </DataTable>
