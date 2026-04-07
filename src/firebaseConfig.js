@@ -2,15 +2,13 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Replace with your actual Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyDA9m1D1TkWKwhQ0WWyJnFX_c0E_OmEjmw",
-    authDomain: "employee-attendance-payroll.firebaseapp.com",
-    projectId: "employee-attendance-payroll",
-    storageBucket: "employee-attendance-payroll.firebasestorage.app",
-    messagingSenderId: "199586240544",
-    appId: "1:199586240544:web:1b1c04e8b59a2182d58445"
-
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);

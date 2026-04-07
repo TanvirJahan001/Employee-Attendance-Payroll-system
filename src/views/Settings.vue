@@ -1,5 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
+import { getAuth, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import InputSwitch from 'primevue/inputswitch';
@@ -7,84 +10,169 @@ import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import Toast from 'primevue/toast';
 import Dialog from 'primevue/dialog';
-import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { useToast } from 'primevue/usetoast';
 
+const auth = getAuth();
 const toast = useToast();
 
+const SETTINGS_KEY = 'app_settings';
+
+const loadSettings = () => {
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+
+const savedSettings = loadSettings();
+
 const notifications = ref({
-    email: true,
-    push: true,
-    updates: false,
-    newsletter: true
+    email: savedSettings?.notifications?.email ?? true,
+    push: savedSettings?.notifications?.push ?? true,
+    updates: savedSettings?.notifications?.updates ?? false,
 });
 
 const security = ref({
-    twoFactor: false,
-    sessionTimeout: '30 mins'
+    twoFactor: savedSettings?.security?.twoFactor ?? false,
 });
 
-const theme = ref('light');
-const language = ref('en');
-const timezone = ref('UTC+6 (Dhaka Time)');
+const language = ref(savedSettings?.language ?? 'en');
+const timezone = ref(savedSettings?.timezone ?? 'UTC+6 (Dhaka Time)');
 
 const languages = [
     { name: 'English', code: 'en' },
     { name: 'Spanish', code: 'es' },
     { name: 'French', code: 'fr' },
-    { name: 'Bangla', code: 'bn' }
+    { name: 'Bangla', code: 'bn' },
 ];
 
 const timezones = [
-    'UTC-5 (Eastern Time)', 
-    'UTC+0 (GMT)', 
+    'UTC-5 (Eastern Time)',
+    'UTC+0 (GMT)',
     'UTC+1 (CET)',
-    'UTC+6 (Dhaka Time)'
+    'UTC+6 (Dhaka Time)',
 ];
 
-// Change Password Logic
+// ─── Change Password ─────────────────────────────────────────────
 const changePasswordDialog = ref(false);
-const passwordForm = ref({
-    current: '',
-    new: '',
-    confirm: ''
-});
+const passwordChanging = ref(false);
+const passwordForm = ref({ current: '', new: '', confirm: '' });
+const pwErrors = ref({ current: '', new: '', confirm: '' });
 
 const openChangePassword = () => {
     passwordForm.value = { current: '', new: '', confirm: '' };
+    pwErrors.value = { current: '', new: '', confirm: '' };
     changePasswordDialog.value = true;
 };
 
-const submitPasswordChange = () => {
-    if (passwordForm.value.new !== passwordForm.value.confirm) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'New passwords do not match', life: 3000 });
-        return;
+const validatePassword = () => {
+    pwErrors.value = { current: '', new: '', confirm: '' };
+    let valid = true;
+
+    if (!passwordForm.value.current) {
+        pwErrors.value.current = 'Current password is required.';
+        valid = false;
     }
-    // Mock API call
-    setTimeout(() => {
-        toast.add({ severity: 'success', summary: 'Success', detail: 'Password changed successfully', life: 3000 });
-        changePasswordDialog.value = false;
-    }, 1000);
+    if (!passwordForm.value.new) {
+        pwErrors.value.new = 'New password is required.';
+        valid = false;
+    } else if (passwordForm.value.new.length < 8) {
+        pwErrors.value.new = 'Password must be at least 8 characters.';
+        valid = false;
+    } else if (!/[A-Z]/.test(passwordForm.value.new)) {
+        pwErrors.value.new = 'Must contain at least one uppercase letter.';
+        valid = false;
+    } else if (!/[0-9]/.test(passwordForm.value.new)) {
+        pwErrors.value.new = 'Must contain at least one number.';
+        valid = false;
+    }
+    if (passwordForm.value.new !== passwordForm.value.confirm) {
+        pwErrors.value.confirm = 'Passwords do not match.';
+        valid = false;
+    }
+    return valid;
 };
 
-// Login History Logic
-const loginHistoryDialog = ref(false);
-const loginHistory = ref([
-    { date: '2023-11-28 10:30 AM', ip: '192.168.1.1', device: 'Chrome / Windows', status: 'Success' },
-    { date: '2023-11-27 09:15 AM', ip: '192.168.1.1', device: 'Chrome / Windows', status: 'Success' },
-    { date: '2023-11-26 02:45 PM', ip: '10.0.0.5', device: 'Safari / iPhone', status: 'Success' },
-    { date: '2023-11-25 11:20 AM', ip: '192.168.1.1', device: 'Chrome / Windows', status: 'Failed' },
-]);
+const submitPasswordChange = async () => {
+    if (!validatePassword()) return;
 
-const openLoginHistory = () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No authenticated user found.', life: 3000 });
+        return;
+    }
+
+    passwordChanging.value = true;
+    try {
+        // Re-authenticate before changing password (prevents unauthorized changes)
+        const credential = EmailAuthProvider.credential(user.email, passwordForm.value.current);
+        await reauthenticateWithCredential(user, credential);
+        await updatePassword(user, passwordForm.value.new);
+
+        toast.add({ severity: 'success', summary: 'Success', detail: 'Password changed successfully.', life: 3000 });
+        changePasswordDialog.value = false;
+    } catch (error) {
+        const knownErrors = {
+            'auth/wrong-password': 'Current password is incorrect.',
+            'auth/invalid-credential': 'Current password is incorrect.',
+            'auth/too-many-requests': 'Too many attempts. Please try again later.',
+            'auth/weak-password': 'New password is too weak.',
+        };
+        const message = knownErrors[error.code] || 'Failed to change password. Please try again.';
+        toast.add({ severity: 'error', summary: 'Error', detail: message, life: 4000 });
+    } finally {
+        passwordChanging.value = false;
+    }
+};
+
+// ─── Login History ────────────────────────────────────────────────
+const loginHistoryDialog = ref(false);
+const loginHistory = ref([]);
+const historyLoading = ref(false);
+
+const openLoginHistory = async () => {
     loginHistoryDialog.value = true;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    historyLoading.value = true;
+    try {
+        const histRef = collection(db, 'users', user.uid, 'loginHistory');
+        const q = query(histRef, orderBy('timestamp', 'desc'), limit(20));
+        const snap = await getDocs(q);
+        loginHistory.value = snap.docs.map(d => {
+            const data = d.data();
+            return {
+                date: data.timestamp?.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) || '—',
+                device: data.userAgent ? data.userAgent.substring(0, 60) + (data.userAgent.length > 60 ? '…' : '') : '—',
+                status: data.success ? 'Success' : 'Failed',
+            };
+        });
+    } catch {
+        toast.add({ severity: 'warn', summary: 'Warning', detail: 'Could not load login history.', life: 3000 });
+        loginHistory.value = [];
+    } finally {
+        historyLoading.value = false;
+    }
 };
 
 const saveSettings = () => {
-    toast.add({ severity: 'success', summary: 'Saved', detail: 'Settings updated successfully', life: 3000 });
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+            notifications: notifications.value,
+            security: security.value,
+            language: language.value,
+            timezone: timezone.value,
+        }));
+        toast.add({ severity: 'success', summary: 'Saved', detail: 'Settings saved successfully.', life: 3000 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save settings.', life: 3000 });
+    }
 };
 </script>
 
@@ -152,7 +240,7 @@ const saveSettings = () => {
                         </div>
                         <InputSwitch v-model="security.twoFactor" />
                     </div>
-                    
+
                     <div class="mt-5">
                         <Button label="Change Password" icon="pi pi-lock" severity="warning" outlined class="mr-2" @click="openChangePassword" />
                         <Button label="View Login History" icon="pi pi-history" severity="secondary" outlined @click="openLoginHistory" />
@@ -168,31 +256,36 @@ const saveSettings = () => {
         <!-- Change Password Dialog -->
         <Dialog v-model:visible="changePasswordDialog" modal header="Change Password" :style="{ width: '25rem' }">
             <div class="flex flex-column gap-3 mb-3">
-                <div class="flex flex-column gap-2">
+                <div class="flex flex-column gap-1">
                     <label for="current" class="font-semibold">Current Password</label>
-                    <Password id="current" v-model="passwordForm.current" :feedback="false" toggleMask />
+                    <Password id="current" v-model="passwordForm.current" :feedback="false" toggleMask :class="{ 'p-invalid': pwErrors.current }" />
+                    <small v-if="pwErrors.current" class="p-error">{{ pwErrors.current }}</small>
                 </div>
-                <div class="flex flex-column gap-2">
-                    <label for="new" class="font-semibold">New Password</label>
-                    <Password id="new" v-model="passwordForm.new" toggleMask />
+                <div class="flex flex-column gap-1">
+                    <label for="newpw" class="font-semibold">New Password</label>
+                    <Password id="newpw" v-model="passwordForm.new" toggleMask :class="{ 'p-invalid': pwErrors.new }" />
+                    <small v-if="pwErrors.new" class="p-error">{{ pwErrors.new }}</small>
+                    <small class="text-500">Min 8 chars, 1 uppercase, 1 number.</small>
                 </div>
-                <div class="flex flex-column gap-2">
+                <div class="flex flex-column gap-1">
                     <label for="confirm" class="font-semibold">Confirm Password</label>
-                    <Password id="confirm" v-model="passwordForm.confirm" :feedback="false" toggleMask />
+                    <Password id="confirm" v-model="passwordForm.confirm" :feedback="false" toggleMask :class="{ 'p-invalid': pwErrors.confirm }" />
+                    <small v-if="pwErrors.confirm" class="p-error">{{ pwErrors.confirm }}</small>
                 </div>
             </div>
             <template #footer>
                 <Button label="Cancel" text severity="secondary" @click="changePasswordDialog = false" />
-                <Button label="Update Password" @click="submitPasswordChange" />
+                <Button label="Update Password" :loading="passwordChanging" @click="submitPasswordChange" />
             </template>
         </Dialog>
 
         <!-- Login History Dialog -->
         <Dialog v-model:visible="loginHistoryDialog" modal header="Login History" :style="{ width: '50rem' }" :breakpoints="{ '960px': '75vw', '640px': '90vw' }">
-            <DataTable :value="loginHistory" stripedRows>
+            <div v-if="historyLoading" class="text-center p-4">Loading...</div>
+            <div v-else-if="loginHistory.length === 0" class="text-center p-4 text-500">No login history found.</div>
+            <DataTable v-else :value="loginHistory" stripedRows>
                 <Column field="date" header="Date & Time"></Column>
-                <Column field="device" header="Device"></Column>
-                <Column field="ip" header="IP Address"></Column>
+                <Column field="device" header="Device / Browser"></Column>
                 <Column field="status" header="Status">
                     <template #body="slotProps">
                         <span :class="slotProps.data.status === 'Success' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'">

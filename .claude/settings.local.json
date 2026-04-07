@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\\\.\\(json|env|js\\)$')",
+      "Bash(npm list:*)",
+      "Bash(grep -n '$refs\\\\|fileInput\\\\|ref\\(' '/e/1. Projects/Vue.JS/Employee-Attendance-Payroll-system/src/views/Profile.vue')",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}

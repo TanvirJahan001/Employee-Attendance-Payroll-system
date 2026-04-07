@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/authStore';
+import Avatar from 'primevue/avatar';
 
 const props = defineProps({
     mobileActive: {
@@ -9,10 +11,11 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(['close-sidebar']);
+const emit = defineEmits(['close-sidebar', 'collapse-change']);
 
 const router = useRouter();
 const route = useRoute();
+const authStore = useAuthStore();
 
 const items = ref([
     { label: 'Dashboard', icon: 'pi pi-home', to: '/dashboard' },
@@ -47,9 +50,9 @@ const onMenuItemClick = () => {
                     <span class="font-bold text-xl text-800">EAP System </span>
                 </div>
                 <!-- Desktop Collapse Toggle -->
-                <i class="pi text-600 cursor-pointer hover:text-primary transition-colors hidden lg:block" 
+                <i class="pi text-600 cursor-pointer hover:text-primary transition-colors hidden lg:block"
                    :class="isCollapsed ? 'pi-angle-double-right text-xl' : 'pi-angle-double-left'"
-                   @click="isCollapsed = !isCollapsed"></i>
+                   @click="isCollapsed = !isCollapsed; emit('collapse-change', isCollapsed)"></i>
                 
                 <!-- Mobile Close Button -->
                  <i class="pi pi-times text-600 cursor-pointer hover:text-primary transition-colors lg:hidden" 
@@ -75,11 +78,14 @@ const onMenuItemClick = () => {
                 <div class="glass-dark border-round-xl flex align-items-center gap-3 cursor-pointer hover:bg-black-alpha-80 transition-colors" 
                      :class="isCollapsed ? 'p-2 justify-content-center' : 'p-3'"
                      @click="router.push('/profile')">
-                    <div class="w-2rem h-2rem border-circle bg-white-alpha-20 flex align-items-center justify-content-center">
-                        <i class="pi pi-user text-white"></i>
-                    </div>
-                    <div v-if="!isCollapsed" class="flex flex-column fadein animation-duration-300">
-                        <span class="text-white text-sm font-bold">Admin User</span>
+                    <Avatar
+                        :label="authStore.userInitials"
+                        shape="circle"
+                        class="w-2rem h-2rem flex-shrink-0"
+                        style="background-color: rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem; font-weight: 700;"
+                    />
+                    <div v-if="!isCollapsed" class="flex flex-column fadein animation-duration-300 overflow-hidden">
+                        <span class="text-white text-sm font-bold white-space-nowrap overflow-hidden text-overflow-ellipsis">{{ authStore.userDisplayName }}</span>
                         <span class="text-white-alpha-60 text-xs">View Profile</span>
                     </div>
                 </div>

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { db } from '../firebaseConfig';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { employeesData } from '../data/employees';
 import { ATTENDANCE_STATUS } from '../constants';
 
@@ -9,7 +10,10 @@ export const useEmployeeStore = defineStore('employee', () => {
     const employees = ref([]);
     const loading = ref(false);
     const searchQuery = ref('');
-    const currentMonthDays = 30;
+
+    // Actual days in the current month (e.g. 28, 29, 30, or 31)
+    const now = new Date();
+    const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
     const filteredEmployees = computed(() => {
         if (!searchQuery.value) return employees.value;
@@ -80,12 +84,28 @@ export const useEmployeeStore = defineStore('employee', () => {
         return attendance;
     };
 
-    const markLeave = (employeeId, day) => {
+    const markLeave = async (employeeId, day) => {
+        // Only allow authenticated admin users to modify attendance
+        const { useAuthStore } = await import('./authStore');
+        const { getActivePinia } = await import('pinia');
+        const pinia = getActivePinia();
+        if (!pinia) return;
+        const authStore = useAuthStore(pinia);
+
+        const currentUser = getAuth().currentUser;
+        if (!currentUser) {
+            console.warn('[Security] markLeave blocked: no authenticated user.');
+            return;
+        }
+        if (!authStore.isAdmin) {
+            console.warn('[Security] markLeave blocked: insufficient privileges.');
+            return;
+        }
+
         const emp = employees.value.find(e => e.id === employeeId);
         if (emp) {
             if (!emp.leaves.includes(day)) {
                 emp.leaves.push(day);
-                // Update attendance status for that day
                 if (emp.attendance[day]) {
                     emp.attendance[day].status = ATTENDANCE_STATUS.LEAVE;
                 }
@@ -120,13 +140,21 @@ export const useEmployeeStore = defineStore('employee', () => {
         };
     };
 
+    const $reset = () => {
+        employees.value = [];
+        loading.value = false;
+        searchQuery.value = '';
+    };
+
     return {
         employees,
         loading,
+        currentMonthDays,
         generateEmployees,
         markLeave,
         calculateSalary,
         searchQuery,
-        filteredEmployees
+        filteredEmployees,
+        $reset,
     };
 });

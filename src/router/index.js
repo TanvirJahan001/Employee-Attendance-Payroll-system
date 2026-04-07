@@ -16,32 +16,38 @@ const router = createRouter({
                 {
                     path: 'dashboard',
                     name: 'dashboard',
-                    component: () => import('../views/Dashboard.vue')
+                    component: () => import('../views/Dashboard.vue'),
+                    meta: { requiresAuth: true }
                 },
                 {
                     path: 'employees',
                     name: 'employees',
-                    component: () => import('../views/EmployeeList.vue')
+                    component: () => import('../views/EmployeeList.vue'),
+                    meta: { requiresAuth: true, requiresAdmin: true }
                 },
                 {
                     path: 'profile',
                     name: 'profile',
-                    component: () => import('../views/Profile.vue')
+                    component: () => import('../views/Profile.vue'),
+                    meta: { requiresAuth: true }
                 },
                 {
                     path: 'settings',
                     name: 'settings',
-                    component: () => import('../views/Settings.vue')
+                    component: () => import('../views/Settings.vue'),
+                    meta: { requiresAuth: true }
                 },
                 {
                     path: 'attendance',
                     name: 'attendance',
-                    component: () => import('../views/Attendance.vue')
+                    component: () => import('../views/Attendance.vue'),
+                    meta: { requiresAuth: true, requiresAdmin: true }
                 },
                 {
                     path: 'payroll',
                     name: 'payroll',
-                    component: () => import('../views/Payroll.vue')
+                    component: () => import('../views/Payroll.vue'),
+                    meta: { requiresAuth: true, requiresAdmin: true }
                 }
             ]
         },
@@ -49,6 +55,11 @@ const router = createRouter({
             path: '/login',
             name: 'login',
             component: () => import('../views/Login.vue')
+        },
+        {
+            path: '/unauthorized',
+            name: 'unauthorized',
+            component: () => import('../views/Unauthorized.vue')
         }
     ]
 });
@@ -67,15 +78,44 @@ const getCurrentUser = () => {
 };
 
 router.beforeEach(async (to, from, next) => {
-    if (to.matched.some((record) => record.meta.requiresAuth)) {
-        if (await getCurrentUser()) {
-            next();
-        } else {
-            next("/login");
-        }
-    } else {
-        next();
+    const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+    const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin);
+
+    if (!requiresAuth) {
+        return next();
     }
+
+    const user = await getCurrentUser();
+    if (!user) {
+        return next('/login');
+    }
+
+    if (requiresAdmin) {
+        // Lazy import to avoid circular dependency
+        const { useAuthStore } = await import('../stores/authStore');
+        const { getActivePinia } = await import('pinia');
+        const pinia = getActivePinia();
+        if (!pinia) return next('/login');
+        const authStore = useAuthStore(pinia);
+
+        // Wait for role to be loaded if still initializing
+        if (authStore.loading) {
+            await new Promise((resolve) => {
+                const unwatch = setInterval(() => {
+                    if (!authStore.loading) {
+                        clearInterval(unwatch);
+                        resolve();
+                    }
+                }, 50);
+            });
+        }
+
+        if (!authStore.isAdmin) {
+            return next('/unauthorized');
+        }
+    }
+
+    next();
 });
 
 export default router;
