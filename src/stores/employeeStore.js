@@ -9,6 +9,22 @@ import { db } from '../firebaseConfig';
 import { employeesData } from '../data/employees';
 import { ATTENDANCE_STATUS } from '../constants';
 
+// ── Internal audit log writer (avoids circular import with leaveStore) ─────────
+const _writeAudit = async ({ action, details, module }) => {
+    try {
+        const auth = getAuth();
+        if (!auth.currentUser) return;
+        await addDoc(collection(db, 'auditLog'), {
+            action,
+            details,
+            module: module || 'system',
+            performedBy: auth.currentUser.uid,
+            performedByName: auth.currentUser.displayName || auth.currentUser.email,
+            timestamp: serverTimestamp(),
+        });
+    } catch { /* non-critical */ }
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Format a Date as YYYY-MM-DD */
@@ -222,6 +238,7 @@ export const useEmployeeStore = defineStore('employee', () => {
             }, { merge: true });
 
             attendance.value[docId] = { status: ATTENDANCE_STATUS.LEAVE, inTime: null, outTime: null };
+            await _writeAudit({ action: 'Leave Marked', details: `Marked employee ID ${employeeId} as on leave for ${dateKey}`, module: 'attendance' });
         } catch (err) {
             console.error('[employeeStore] markLeave error', err);
         }
@@ -254,6 +271,7 @@ export const useEmployeeStore = defineStore('employee', () => {
 
             await setDoc(docRef, newEmp);
             employees.value.push({ firestoreId: String(newId), ...newEmp });
+            await _writeAudit({ action: 'Employee Added', details: `Added employee: ${newEmp.name} (ID ${newId}), Role: ${newEmp.role}`, module: 'employees' });
             return { success: true, id: newId };
         } catch (err) {
             console.error('[employeeStore] addEmployee error', err);
@@ -285,6 +303,7 @@ export const useEmployeeStore = defineStore('employee', () => {
             if (idx !== -1) {
                 employees.value[idx] = { ...employees.value[idx], ...sanitized };
             }
+            await _writeAudit({ action: 'Employee Updated', details: `Updated employee ID ${employeeId}: ${sanitized.name}`, module: 'employees' });
             return { success: true };
         } catch (err) {
             console.error('[employeeStore] updateEmployee error', err);
@@ -299,8 +318,10 @@ export const useEmployeeStore = defineStore('employee', () => {
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
         try {
+            const empName = employees.value.find(e => e.id === employeeId)?.name || `ID ${employeeId}`;
             await deleteDoc(doc(db, 'employees', String(employeeId)));
             employees.value = employees.value.filter(e => e.id !== employeeId);
+            await _writeAudit({ action: 'Employee Deleted', details: `Deleted employee: ${empName} (ID ${employeeId})`, module: 'employees' });
             return { success: true };
         } catch (err) {
             console.error('[employeeStore] deleteEmployee error', err);

@@ -54,6 +54,24 @@ const router = createRouter({
                     name: 'checkin',
                     component: () => import('../views/CheckIn.vue'),
                     meta: { requiresAuth: true }
+                },
+                {
+                    path: 'leave',
+                    name: 'leave',
+                    component: () => import('../views/LeaveRequests.vue'),
+                    meta: { requiresAuth: true }
+                },
+                {
+                    path: 'holidays',
+                    name: 'holidays',
+                    component: () => import('../views/Holidays.vue'),
+                    meta: { requiresAuth: true, requiresAdmin: true }
+                },
+                {
+                    path: 'audit',
+                    name: 'audit',
+                    component: () => import('../views/AuditLog.vue'),
+                    meta: { requiresAuth: true, requiresAdmin: true }
                 }
             ]
         },
