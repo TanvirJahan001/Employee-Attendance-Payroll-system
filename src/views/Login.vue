@@ -15,6 +15,7 @@ const password = ref('');
 const loading = ref(false);
 const emailError = ref('');
 const passwordError = ref('');
+const loginError = ref('');   // inline banner error
 const router = useRouter();
 const toast = useToast();
 const auth = getAuth();
@@ -53,6 +54,7 @@ const validate = () => {
 };
 
 const handleLogin = async () => {
+    loginError.value = '';
     if (!validate()) return;
 
     loading.value = true;
@@ -65,11 +67,13 @@ const handleLogin = async () => {
             'auth/user-not-found': 'Invalid email or password.',
             'auth/wrong-password': 'Invalid email or password.',
             'auth/invalid-credential': 'Invalid email or password.',
+            'auth/invalid-email': 'Invalid email address.',
             'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
             'auth/user-disabled': 'This account has been disabled. Contact your administrator.',
             'auth/network-request-failed': 'Network error. Please check your connection.',
         };
-        const message = knownErrors[error.code] || 'Login failed. Please try again.';
+        const message = knownErrors[error.code] || `Login failed. (${error.code || 'unknown error'})`;
+        loginError.value = message;
         toast.add({ severity: 'error', summary: 'Login Failed', detail: message, life: 4000 });
     } finally {
         loading.value = false;
@@ -169,6 +173,11 @@ const handleForgotPassword = async () => {
                     <small v-if="passwordError" class="p-error">{{ passwordError }}</small>
                 </div>
 
+                <!-- Inline auth error banner -->
+                <div v-if="loginError" class="login-error-banner mb-3">
+                    <i class="pi pi-exclamation-circle mr-2"></i>{{ loginError }}
+                </div>
+
                 <Button label="Sign In" type="submit" class="w-full p-3 text-lg font-bold shadow-4 hover:shadow-6 transition-all" :loading="loading" rounded />
 
                 <div class="text-center mt-4">
@@ -219,5 +228,14 @@ const handleForgotPassword = async () => {
 </template>
 
 <style scoped>
-/* Scoped styles if needed */
+.login-error-banner {
+    background: rgba(220, 38, 38, 0.12);
+    border: 1px solid rgba(220, 38, 38, 0.4);
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    color: #dc2626;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+}
 </style>

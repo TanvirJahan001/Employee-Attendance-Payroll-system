@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -88,56 +87,42 @@ const router = createRouter({
     ]
 });
 
-const getCurrentUser = () => {
-    return new Promise((resolve, reject) => {
-        const removeListener = onAuthStateChanged(
-            getAuth(),
-            (user) => {
-                removeListener();
-                resolve(user);
-            },
-            reject
-        );
-    });
-};
+// ── Navigation guard ─────────────────────────────────────────────────────────
+// Uses authStore (initialised in main.js) so we never spin up a second
+// onAuthStateChanged listener. Waits for the initial auth check to complete.
 
 router.beforeEach(async (to, from, next) => {
-    const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
-    const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin);
+    const requiresAuth  = to.matched.some(r => r.meta.requiresAuth);
+    const requiresAdmin = to.matched.some(r => r.meta.requiresAdmin);
 
-    if (!requiresAuth) {
-        return next();
+    // Routes that need no authentication pass straight through
+    if (!requiresAuth) return next();
+
+    // Lazily import to avoid circular dependency (router is imported in main before stores)
+    const { useAuthStore } = await import('../stores/authStore');
+    const { getActivePinia } = await import('pinia');
+    const pinia = getActivePinia();
+    if (!pinia) return next('/login');
+
+    const authStore = useAuthStore(pinia);
+
+    // Wait for Firebase auth state to be determined on first load
+    if (authStore.loading) {
+        await new Promise((resolve) => {
+            const timer = setInterval(() => {
+                if (!authStore.loading) {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 30);
+        });
     }
 
-    const user = await getCurrentUser();
-    if (!user) {
-        return next('/login');
-    }
+    // Not authenticated → send to login
+    if (!authStore.isAuthenticated) return next('/login');
 
-    if (requiresAdmin) {
-        // Lazy import to avoid circular dependency
-        const { useAuthStore } = await import('../stores/authStore');
-        const { getActivePinia } = await import('pinia');
-        const pinia = getActivePinia();
-        if (!pinia) return next('/login');
-        const authStore = useAuthStore(pinia);
-
-        // Wait for role to be loaded if still initializing
-        if (authStore.loading) {
-            await new Promise((resolve) => {
-                const unwatch = setInterval(() => {
-                    if (!authStore.loading) {
-                        clearInterval(unwatch);
-                        resolve();
-                    }
-                }, 50);
-            });
-        }
-
-        if (!authStore.isAdmin) {
-            return next('/unauthorized');
-        }
-    }
+    // Admin-only page → check role
+    if (requiresAdmin && !authStore.isAdmin) return next('/unauthorized');
 
     next();
 });
