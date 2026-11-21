@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { getAuth, signOut } from "firebase/auth";
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
+import { useLeaveStore } from '../stores/leaveStore';
 import Button from 'primevue/button';
 import Avatar from 'primevue/avatar';
 import Menu from 'primevue/menu';
@@ -14,6 +15,7 @@ const router = useRouter();
 const auth = getAuth();
 const employeeStore = useEmployeeStore();
 const authStore = useAuthStore();
+const leaveStore = useLeaveStore();
 const menu = ref();
 
 const items = ref([
@@ -32,10 +34,10 @@ const items = ref([
         label: 'Logout',
         icon: 'pi pi-sign-out',
         command: async () => {
-            // Clear all client-side data before signing out
-            employeeStore.$reset();
-            authStore.clearAuth();
             await signOut(auth);
+            employeeStore.$reset();
+            leaveStore.$reset();
+            authStore.clearAuth();
             router.push('/login');
         }
     }

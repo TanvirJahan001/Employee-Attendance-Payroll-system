@@ -7,6 +7,7 @@ import { db } from '../firebaseConfig';
 export const useAuthStore = defineStore('auth', () => {
     const user = ref(null);
     const role = ref(null); // 'admin' | 'employee'
+    const employeeId = ref(null);
     const loading = ref(true);
 
     const isAdmin = computed(() => role.value === 'admin');
@@ -21,18 +22,26 @@ export const useAuthStore = defineStore('auth', () => {
     const loadUserRole = async (uid) => {
         try {
             const userDoc = await getDoc(doc(db, 'users', uid));
+            if (user.value?.uid !== uid) return;
+
             if (userDoc.exists()) {
-                role.value = userDoc.data().role || 'employee';
+                const profile = userDoc.data();
+                role.value = profile.role || 'employee';
+                employeeId.value = profile.employeeId ?? null;
             } else {
                 // First-time user: default to 'employee', admins must be set in Firestore
                 role.value = 'employee';
+                employeeId.value = null;
                 await setDoc(doc(db, 'users', uid), {
                     role: 'employee',
                     createdAt: serverTimestamp(),
                 });
             }
-        } catch {
+        } catch (error) {
+            if (user.value?.uid !== uid) return;
             role.value = 'employee';
+            employeeId.value = null;
+            console.error('[authStore] loadUserRole error', error);
         }
     };
 
@@ -54,11 +63,14 @@ export const useAuthStore = defineStore('auth', () => {
         const auth = getAuth();
         onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
+                loading.value = true;
                 user.value = firebaseUser;
-                await loadUserRole(firebaseUser.uid);
-            } else {
-                user.value = null;
                 role.value = null;
+                employeeId.value = null;
+                await loadUserRole(firebaseUser.uid);
+                if (user.value?.uid !== firebaseUser.uid) return;
+            } else {
+                clearAuth();
             }
             loading.value = false;
         });
@@ -67,11 +79,13 @@ export const useAuthStore = defineStore('auth', () => {
     const clearAuth = () => {
         user.value = null;
         role.value = null;
+        employeeId.value = null;
     };
 
     return {
         user,
         role,
+        employeeId,
         loading,
         isAdmin,
         isAuthenticated,

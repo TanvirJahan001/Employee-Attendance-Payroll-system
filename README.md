@@ -33,41 +33,58 @@ Follow these steps to set up the project locally.
 
 ### Prerequisites
 
--   Node.js (v16.0 or higher)
--   npm or yarn
+-   Node.js 20.19+ on the 20.x line, or 22.12+
+-   npm
 
 ### Installation
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/employee-attendance-payroll.git
-    cd employee-attendance-payroll
+    git clone https://github.com/TanvirJahan001/Employee-Attendance-Payroll-system.git
+    cd Employee-Attendance-Payroll-system
     ```
 
 2.  **Install dependencies**
     ```bash
-    npm install
+    npm ci
     ```
 
-3.  **Configure Firebase**
-    -   Create a project in the [Firebase Console](https://console.firebase.google.com/).
-    -   Create a `.env` file in the root directory.
-    -   Add your Firebase configuration keys:
-        ```env
-        VITE_FIREBASE_API_KEY=your_api_key
-        VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-        VITE_FIREBASE_PROJECT_ID=your_project_id
-        VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-        VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-        VITE_FIREBASE_APP_ID=your_app_id
+3.  **Add your Firebase web configuration**
+
+    In the [Firebase Console](https://console.firebase.google.com/), open your project and go to **Project settings → General → Your apps**. Register a Web app if needed, then open its SDK setup **Config**. Copy [`.env.example`](.env.example) to `.env` and map the values from that config.
+
+    | Firebase config field | Variable in `.env` |
+    | --- | --- |
+    | `apiKey` | `VITE_FIREBASE_API_KEY` |
+    | `authDomain` | `VITE_FIREBASE_AUTH_DOMAIN` |
+    | `projectId` | `VITE_FIREBASE_PROJECT_ID` |
+    | `storageBucket` | `VITE_FIREBASE_STORAGE_BUCKET` |
+    | `messagingSenderId` | `VITE_FIREBASE_MESSAGING_SENDER_ID` |
+    | `appId` | `VITE_FIREBASE_APP_ID` |
+
+    The repository ignores `.env`. Restart Vite after editing it. If you deploy the frontend, set the same variables in the host's build environment and rebuild. [Firebase Web setup](https://firebase.google.com/docs/web/setup)
+
+4.  **Set up the Firebase services**
+
+    - In **Authentication → Sign-in method**, enable **Email/Password**. In **Users**, add your first account and copy its UID. For local password-reset links, add `localhost` under **Authentication → Settings → Authorized domains** if it is missing. [Firebase Authentication setup](https://firebase.google.com/docs/auth/web/password-auth)
+    - In **Firestore Database**, create the **Standard** database with ID `(default)` in **production mode** if needed. Deploy the repository's rules and leave-request index from the project root. Replace `YOUR_PROJECT_ID` with the same project ID you set in `.env`. [Firestore setup](https://firebase.google.com/docs/firestore/quickstart), [Firebase CLI setup](https://firebase.google.com/docs/cli)
+
+        ```bash
+        npx firebase-tools login
+        npx firebase-tools deploy --only firestore:rules,firestore:indexes --project YOUR_PROJECT_ID
         ```
 
-4.  **Run the development server**
+    - In **Firestore Database → Data**, create the collection `users` and a document whose ID is the UID you copied. Add a **string** field named `role` with value `admin`. If that document already exists, edit its `role` field. Employees can check in and request leave when their `users/<UID>` document has a **number** field named `employeeId` that matches their employee record's `id`.
+    - Profile photo uploads are optional. They use Cloud Storage, which requires the Blaze plan. If you enable Storage, update `VITE_FIREBASE_STORAGE_BUCKET` with the actual bucket from the web config and run `npx firebase-tools deploy --only storage --project YOUR_PROJECT_ID`. [Cloud Storage billing requirements](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
+
+5.  **Run the development server**
     ```bash
     npm run dev
     ```
 
-5.  **Build for production**
+    Open the local URL shown in the terminal and sign in with your Firebase Authentication account. The admin dashboard imports the bundled sample employees if the `employees` collection is empty.
+
+6.  **Build for production**
     ```bash
     npm run build
     ```

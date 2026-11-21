@@ -109,14 +109,23 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── kept for backward compatibility (called by Dashboard / Attendance / Payroll) ──
     const generateEmployees = loadEmployees;
 
+    const loadEmployee = async (employeeId) => {
+        try {
+            const snap = await getDoc(doc(db, 'employees', String(employeeId)));
+            return snap.exists() ? snap.data() : null;
+        } catch (err) {
+            console.error('[employeeStore] loadEmployee error', err);
+            return null;
+        }
+    };
+
     // ── Firestore: load attendance for a specific date ────────────────────────
 
-    const loadAttendanceForDate = async (dateKey) => {
+    const loadAttendanceForDate = async (dateKey, employeeId = null) => {
         try {
-            const q = query(
-                collection(db, 'attendance'),
-                where('date', '==', dateKey)
-            );
+            const filters = [where('date', '==', dateKey)];
+            if (employeeId != null) filters.push(where('employeeId', '==', employeeId));
+            const q = query(collection(db, 'attendance'), ...filters);
             const snap = await getDocs(q);
             snap.forEach(d => {
                 const data = d.data();
@@ -381,6 +390,7 @@ export const useEmployeeStore = defineStore('employee', () => {
         filteredEmployees,
         // load
         loadEmployees,
+        loadEmployee,
         generateEmployees,
         loadAttendanceForDate,
         // attendance

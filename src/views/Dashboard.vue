@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, computed, ref } from 'vue';
 import { useEmployeeStore } from '../stores/employeeStore';
+import { useAuthStore } from '../stores/authStore';
 import { ATTENDANCE_STATUS } from '../constants';
 import Card from 'primevue/card';
 import Chart from 'primevue/chart';
@@ -8,11 +9,16 @@ import Avatar from 'primevue/avatar';
 import Tag from 'primevue/tag';
 
 const store = useEmployeeStore();
+const authStore = useAuthStore();
 const todayKey = store.toDateKey(new Date());
+const ownAttendance = computed(() => store.getAttendance(authStore.employeeId, todayKey));
 
 onMounted(async () => {
-    await store.loadEmployees();
-    await store.loadAttendanceForDate(todayKey);
+    if (authStore.isAdmin) {
+        await Promise.all([store.loadEmployees(), store.loadAttendanceForDate(todayKey)]);
+    } else if (authStore.employeeId != null) {
+        await store.loadAttendanceForDate(todayKey, authStore.employeeId);
+    }
 });
 
 const totalEmployees = computed(() => store.employees.length);
@@ -62,7 +68,7 @@ const chartOptions = ref({
 </script>
 
 <template>
-    <div class="grid">
+    <div v-if="authStore.isAdmin" class="grid">
         <!-- KPI cards -->
         <div class="col-12 lg:col-4 animation-duration-500 animation-ease-out fadeinup">
             <Card class="mb-0">
@@ -131,6 +137,16 @@ const chartOptions = ref({
             </Card>
         </div>
     </div>
+    <Card v-else>
+        <template #title>My Attendance Today</template>
+        <template #content>
+            <p v-if="authStore.employeeId == null" class="text-600 m-0">Ask your administrator to link your account to an employee record.</p>
+            <template v-else>
+                <p class="mt-0"><Tag :value="ownAttendance.status" /></p>
+                <RouterLink to="/checkin">View check-in and check-out</RouterLink>
+            </template>
+        </template>
+    </Card>
 </template>
 
 <style scoped>

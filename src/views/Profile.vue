@@ -124,10 +124,11 @@ const onUpload = async (event) => {
     const file = event.files?.[0];
     if (!file) return;
 
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    const IMAGE_EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
     const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    const ext = IMAGE_EXTENSIONS[file.type];
+    if (!ext) {
         toast.add({ severity: 'error', summary: 'Invalid file', detail: 'Only JPEG, PNG, or WebP images allowed.', life: 3000 });
         return;
     }
@@ -141,10 +142,8 @@ const onUpload = async (event) => {
 
     uploadingAvatar.value = true;
     try {
-        // Store avatar under avatars/{uid}/avatar.{ext}
-        const ext = file.name.split('.').pop().toLowerCase();
         const fileRef = storageRef(storage, `avatars/${user.uid}/avatar.${ext}`);
-        await uploadBytes(fileRef, file);
+        await uploadBytes(fileRef, file, { contentType: file.type });
         const downloadUrl = await getDownloadURL(fileRef);
 
         // Persist to Firebase Auth and Firestore

@@ -23,7 +23,8 @@ service cloud.firestore {
     }
 
     function isDemoSync() {
-      return isOwner('demo-attendance-scheduler');
+      return signedIn()
+        && request.auth.uid in ['demo-attendance-scheduler', 'vercel-demo-attendance-scheduler'];
     }
 
     function isDemoEmployeeDocument(documentId) {
@@ -77,7 +78,7 @@ service cloud.firestore {
         && validDemoAttendance(documentId, request.resource.data);
       allow update: if isDemoSync() && isDemoAttendancePath(documentId)
         && isDemoDataset(resource.data)
-        && resource.data.recordedBy == request.auth.uid
+        && resource.data.recordedBy == 'demo-attendance-scheduler'
         && resource.data.status == 'Present'
         && resource.data.outTime == null
         && isTime(request.resource.data.outTime)
@@ -116,7 +117,7 @@ service cloud.firestore {
         && data.employeeId is int
         && documentId == string(data.employeeId) + '_' + data.date
         && isDemoDataset(data)
-        && data.recordedBy == request.auth.uid
+        && data.recordedBy == 'demo-attendance-scheduler'
         && data.updatedAt == request.time
         && (
           (data.status == 'Present' && isTime(data.inTime) && (data.outTime == null || isTime(data.outTime)))

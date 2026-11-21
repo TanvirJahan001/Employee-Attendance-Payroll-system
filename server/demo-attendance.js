@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 export const DEMO_DATASET = 'daily-attendance-v1';
 export const DEMO_SYNC_UID = 'demo-attendance-scheduler';
+export const VERCEL_DEMO_SYNC_UID = 'vercel-demo-attendance-scheduler';
 
 const employees = [
     { id: 101, name: 'Amina Karim', role: 'HR Coordinator', department: 'People', baseSalary: 3200 },
@@ -167,4 +168,20 @@ export async function syncDemoAttendance(options, { now = new Date(), historyDay
         recordsWritten += await db.write(writes);
     }
     return { date: today, employeeCount: employeeIds.length, recordsWritten };
+}
+
+export async function signInDemoScheduler({ apiKey, email, password, uid }) {
+    if (!apiKey || !email || !password) throw new Error('Demo attendance credentials are missing');
+    const url = new URL('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword');
+    url.searchParams.set('key', apiKey);
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, returnSecureToken: true }),
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error(`Demo attendance sign-in returned HTTP ${response.status}`);
+    const { idToken, localId } = await response.json();
+    if (!idToken || localId !== uid) throw new Error('Unexpected demo attendance user');
+    return idToken;
 }

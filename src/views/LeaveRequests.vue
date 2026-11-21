@@ -1,8 +1,5 @@
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
-import { getAuth } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import { useLeaveStore, LEAVE_TYPES, LEAVE_STATUS } from '../stores/leaveStore';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
@@ -26,30 +23,18 @@ const authStore    = useAuthStore();
 const toast        = useToast();
 
 // Linked employee ID for the current logged-in user
-const myEmployeeId   = ref(null);
+const myEmployeeId   = computed(() => authStore.employeeId);
 const myEmployeeName = ref('');
 const loadingMe      = ref(true);
 
 onMounted(async () => {
-    await empStore.loadEmployees();
-    await leaveStore.loadRequests();
-
-    const user = getAuth().currentUser;
-    if (user) {
-        try {
-            const snap = await getDoc(doc(db, 'users', user.uid));
-            if (snap.exists() && snap.data().employeeId) {
-                myEmployeeId.value = snap.data().employeeId;
-            } else {
-                const matched = empStore.employees.find(
-                    e => e.name.toLowerCase() === (user.displayName || '').toLowerCase()
-                );
-                if (matched) myEmployeeId.value = matched.id;
-            }
-            const emp = empStore.employees.find(e => e.id === myEmployeeId.value);
-            myEmployeeName.value = emp?.name || user.displayName || 'Unknown';
-        } catch { /* proceed */ }
+    const submitterUid = authStore.isAdmin ? null : authStore.user.uid;
+    const requests = leaveStore.loadRequests(submitterUid);
+    if (myEmployeeId.value != null) {
+        const employee = await empStore.loadEmployee(myEmployeeId.value);
+        myEmployeeName.value = employee?.name ?? '';
     }
+    await requests;
     loadingMe.value = false;
 });
 
@@ -182,7 +167,7 @@ const myRequests = computed(() =>
                 badgeSeverity="danger"
                 @click="() => {}"
             />
-            <Button icon="pi pi-plus" label="Request Leave" @click="openSubmitDialog" :disabled="loadingMe || !myEmployeeId" />
+            <Button icon="pi pi-plus" label="Request Leave" @click="openSubmitDialog" :disabled="loadingMe || !myEmployeeName" />
         </div>
     </div>
 

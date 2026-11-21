@@ -36,14 +36,19 @@ export const useLeaveStore = defineStore('leave', () => {
 
     // ── Load ─────────────────────────────────────────────────────────────────
 
-    const loadRequests = async (filterEmployeeId = null) => {
+    const loadRequests = async (submitterUid = null) => {
+        const auth = getAuth();
+        const currentUid = auth.currentUser?.uid;
+        if (!currentUid) return;
+
         loading.value = true;
+        requests.value = [];
         try {
             let q;
-            if (filterEmployeeId != null) {
+            if (submitterUid != null) {
                 q = query(
                     collection(db, 'leaveRequests'),
-                    where('employeeId', '==', filterEmployeeId),
+                    where('submittedBy', '==', submitterUid),
                     orderBy('submittedAt', 'desc')
                 );
             } else {
@@ -53,6 +58,7 @@ export const useLeaveStore = defineStore('leave', () => {
                 );
             }
             const snap = await getDocs(q);
+            if (auth.currentUser?.uid !== currentUid) return;
             requests.value = snap.docs.map(d => ({
                 firestoreId: d.id,
                 ...d.data(),
@@ -63,7 +69,7 @@ export const useLeaveStore = defineStore('leave', () => {
         } catch (err) {
             console.error('[leaveStore] loadRequests error', err);
         } finally {
-            loading.value = false;
+            if (auth.currentUser?.uid === currentUid) loading.value = false;
         }
     };
 

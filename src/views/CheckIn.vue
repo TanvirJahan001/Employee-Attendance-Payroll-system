@@ -1,10 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { getAuth } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
+import { ATTENDANCE_STATUS } from '../constants';
 import { useToast } from 'primevue/usetoast';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
@@ -22,7 +20,8 @@ let clockInterval = null;
 
 // The employee record linked to the current user's uid
 // Stored in Firestore users/{uid} as employeeId field (set by admin)
-const linkedEmployeeId = ref(null);
+const linkedEmployeeId = computed(() => authStore.employeeId);
+const employee = ref(null);
 const loadingEmployee = ref(true);
 const checkingIn = ref(false);
 const checkingOut = ref(false);
@@ -31,27 +30,12 @@ const checkingOut = ref(false);
 onMounted(async () => {
     clockInterval = setInterval(() => { now.value = new Date(); }, 1000);
 
-    // Load employees
-    await store.loadEmployees();
-    await store.loadAttendanceForDate(today);
-
-    // Resolve which employee record belongs to this user
-    const user = getAuth().currentUser;
-    if (user) {
-        try {
-            const snap = await getDoc(doc(db, 'users', user.uid));
-            if (snap.exists() && snap.data().employeeId) {
-                linkedEmployeeId.value = snap.data().employeeId;
-            } else {
-                // Fallback: match by display name (for demo purposes)
-                const matched = store.employees.find(
-                    e => e.name.toLowerCase() === (user.displayName || '').toLowerCase()
-                );
-                if (matched) linkedEmployeeId.value = matched.id;
-            }
-        } catch (err) {
-            console.error('[CheckIn] failed to load user mapping', err);
-        }
+    const employeeId = linkedEmployeeId.value;
+    if (employeeId != null) {
+        [employee.value] = await Promise.all([
+            store.loadEmployee(employeeId),
+            store.loadAttendanceForDate(today, employeeId),
+        ]);
     }
     loadingEmployee.value = false;
 });
@@ -62,12 +46,6 @@ onUnmounted(() => {
 
 // ── computed ──────────────────────────────────────────────────────────────────
 
-const employee = computed(() =>
-    linkedEmployeeId.value != null
-        ? store.employees.find(e => e.id === linkedEmployeeId.value)
-        : null
-);
-
 const todayRecord = computed(() =>
     linkedEmployeeId.value != null
         ? store.getAttendance(linkedEmployeeId.value, today)
@@ -76,6 +54,7 @@ const todayRecord = computed(() =>
 
 const isCheckedIn  = computed(() => !!todayRecord.value?.inTime);
 const isCheckedOut = computed(() => !!todayRecord.value?.outTime);
+const isOnLeave = computed(() => todayRecord.value.status === ATTENDANCE_STATUS.LEAVE);
 
 const formattedTime = computed(() => {
     return now.value.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -88,7 +67,7 @@ const formattedDate = computed(() => {
 // ── actions ───────────────────────────────────────────────────────────────────
 
 const handleCheckIn = async () => {
-    if (!linkedEmployeeId.value) return;
+    if (!employee.value || isOnLeave.value) return;
     checkingIn.value = true;
     const result = await store.checkIn(linkedEmployeeId.value, today);
     if (result.success) {
@@ -100,7 +79,7 @@ const handleCheckIn = async () => {
 };
 
 const handleCheckOut = async () => {
-    if (!linkedEmployeeId.value) return;
+    if (!employee.value) return;
     checkingOut.value = true;
     const result = await store.checkOut(linkedEmployeeId.value, today);
     if (result.success) {
@@ -112,12 +91,14 @@ const handleCheckOut = async () => {
 };
 
 const statusSeverity = computed(() => {
+    if (isOnLeave.value) return 'warn';
     if (isCheckedOut.value) return 'secondary';
     if (isCheckedIn.value) return 'success';
     return 'danger';
 });
 
 const statusLabel = computed(() => {
+    if (isOnLeave.value) return 'On Leave';
     if (isCheckedOut.value) return 'Checked Out';
     if (isCheckedIn.value) return 'Checked In';
     return 'Not Checked In';
@@ -152,7 +133,7 @@ const statusLabel = computed(() => {
                         size="large"
                         class="px-5 py-3 text-lg font-bold shadow-4"
                         :loading="checkingIn"
-                        :disabled="loadingEmployee || !employee"
+                        :disabled="loadingEmployee || !employee || isOnLeave"
                         @click="handleCheckIn"
                     />
                     <Button
