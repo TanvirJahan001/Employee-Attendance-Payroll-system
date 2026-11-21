@@ -4,6 +4,7 @@ import {
     collection, getDocs, query, orderBy, limit, startAfter
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { demoAuditLog } from '../demo/data';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -11,12 +12,13 @@ import Tag from 'primevue/tag';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 
-const logs    = ref([]);
+const props = defineProps({ demo: Boolean });
+const logs    = ref(props.demo ? demoAuditLog() : []);
 const loading = ref(false);
 const search  = ref('');
 const moduleFilter = ref('');
 const lastDoc = ref(null);
-const hasMore = ref(true);
+const hasMore = ref(!props.demo);
 const PAGE    = 50;
 
 const MODULE_OPTIONS = [
@@ -29,6 +31,7 @@ const MODULE_OPTIONS = [
 ];
 
 const loadLogs = async (reset = true) => {
+    if (props.demo) return;
     if (reset) {
         logs.value = [];
         lastDoc.value = null;
@@ -108,7 +111,7 @@ const formatDateTime = (d) => {
 <template>
     <div class="mb-4">
         <h2 class="text-3xl font-bold text-800 mb-1">Audit Log</h2>
-        <p class="text-600">Complete trail of all admin actions in the system</p>
+        <p class="text-600">{{ demo ? 'Browse sample administrative activity.' : 'Review recorded administrative activity.' }}</p>
     </div>
 
     <!-- Filter bar -->
@@ -125,7 +128,7 @@ const formatDateTime = (d) => {
             placeholder="Filter by module"
             class="w-12rem"
         />
-        <Button icon="pi pi-refresh" severity="secondary" @click="loadLogs(true)" :loading="loading" title="Refresh" />
+        <Button v-if="!demo" icon="pi pi-refresh" severity="secondary" @click="loadLogs(true)" :loading="loading" title="Refresh" />
     </div>
 
     <!-- Stats -->

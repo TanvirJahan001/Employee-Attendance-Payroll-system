@@ -5,21 +5,23 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebaseConfig';
 import { useAuthStore } from '../stores/authStore';
+import { demoAccount } from '../demo/data';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Avatar from 'primevue/avatar';
 import Toast from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
 
-const auth = getAuth();
+const props = defineProps({ demo: Boolean });
+const auth = props.demo ? null : getAuth();
 const authStore = useAuthStore();
 const toast = useToast();
 
 const profile = ref({
-    name: '',
+    name: props.demo ? demoAccount.name : '',
     phone: '',
-    location: '',
-    bio: '',
+    location: props.demo ? demoAccount.location : '',
+    bio: props.demo ? demoAccount.bio : '',
 });
 
 const avatarUrl = ref('');
@@ -30,7 +32,7 @@ const uploadingAvatar = ref(false);
 
 // Load profile from Firestore on mount
 const loadProfile = async () => {
-    const user = auth.currentUser;
+    const user = auth?.currentUser;
     if (!user) return;
 
     profile.value.name = user.displayName || '';
@@ -51,12 +53,13 @@ const loadProfile = async () => {
 };
 loadProfile();
 
-const userEmail = computed(() => auth.currentUser?.email || '');
+const userEmail = computed(() => props.demo ? demoAccount.email : auth.currentUser?.email || '');
 const memberSince = computed(() => {
-    const created = auth.currentUser?.metadata?.creationTime;
+    const created = auth?.currentUser?.metadata?.creationTime;
     return created ? new Date(created).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
 });
 const lastLogin = computed(() => {
+    if (props.demo) return 'Current demo session';
     const last = auth.currentUser?.metadata?.lastSignInTime;
     return last ? new Date(last).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 });
@@ -92,6 +95,7 @@ const validate = () => {
 };
 
 const saveProfile = async () => {
+    if (!auth) return;
     if (!validate()) return;
     const user = auth.currentUser;
     if (!user) return;
@@ -121,6 +125,7 @@ const saveProfile = async () => {
 // ── Avatar Upload to Firebase Storage ───────────────────────────────────────
 
 const onUpload = async (event) => {
+    if (!auth) return;
     const file = event.files?.[0];
     if (!file) return;
 
@@ -179,13 +184,14 @@ const onUpload = async (event) => {
                     />
                     <Avatar
                         v-else
-                        :label="authStore.userInitials"
+                        :label="demo ? demoAccount.initials : authStore.userInitials"
                         class="w-8rem h-8rem shadow-4 text-4xl font-bold"
                         style="background-color: var(--primary-500); color: #fff;"
                         shape="circle"
                     />
                     <!-- Upload button -->
                     <Button
+                        v-if="!demo"
                         icon="pi pi-camera"
                         rounded
                         severity="secondary"
@@ -196,6 +202,7 @@ const onUpload = async (event) => {
                         title="Change avatar"
                     />
                     <input
+                        v-if="!demo"
                         ref="fileInput"
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -203,8 +210,8 @@ const onUpload = async (event) => {
                         @change="onUpload({ files: $event.target.files })"
                     />
                 </div>
-                <h2 class="text-900 font-bold mb-1">{{ authStore.userDisplayName }}</h2>
-                <span class="text-primary-600 font-medium mb-3">{{ authStore.isAdmin ? 'Admin' : 'Employee' }}</span>
+                <h2 class="text-900 font-bold mb-1">{{ demo ? demoAccount.name : authStore.userDisplayName }}</h2>
+                <span class="text-primary-600 font-medium mb-3">{{ demo ? 'Viewer' : authStore.isAdmin ? 'Admin' : 'Employee' }}</span>
 
                 <div class="w-full mt-5 border-top-1 border-gray-300 pt-4">
                     <div class="flex justify-content-between mb-3">
@@ -228,13 +235,13 @@ const onUpload = async (event) => {
             <div class="glass p-5 h-full">
                 <h3 class="text-900 font-bold mb-4 flex align-items-center">
                     <i class="pi pi-user-edit mr-2 text-primary"></i>
-                    Edit Profile
+                    {{ demo ? 'Profile Details' : 'Edit Profile' }}
                 </h3>
 
                 <div class="grid formgrid p-fluid">
                     <div class="field col-12 md:col-6 mb-4">
                         <label for="name" class="font-medium text-700">Full Name</label>
-                        <InputText id="name" v-model="profile.name" :class="{ 'p-invalid': nameError }" class="bg-white-alpha-50" maxlength="80" />
+                        <InputText id="name" v-model="profile.name" :readonly="demo" :class="{ 'p-invalid': nameError }" class="bg-white-alpha-50" maxlength="80" />
                         <small v-if="nameError" class="p-error">{{ nameError }}</small>
                     </div>
                     <div class="field col-12 md:col-6 mb-4">
@@ -243,28 +250,29 @@ const onUpload = async (event) => {
                     </div>
                     <div class="field col-12 md:col-6 mb-4">
                         <label for="phone" class="font-medium text-700">Phone Number</label>
-                        <InputText id="phone" v-model="profile.phone" :class="{ 'p-invalid': phoneError }" class="bg-white-alpha-50" maxlength="20" placeholder="+1 (555) 000-0000" />
+                        <InputText id="phone" v-model="profile.phone" :readonly="demo" :class="{ 'p-invalid': phoneError }" class="bg-white-alpha-50" maxlength="20" placeholder="+1 (555) 000-0000" />
                         <small v-if="phoneError" class="p-error">{{ phoneError }}</small>
                     </div>
                     <div class="field col-12 md:col-6 mb-4">
                         <label for="location" class="font-medium text-700">Location</label>
-                        <InputText id="location" v-model="profile.location" class="bg-white-alpha-50" maxlength="100" />
+                        <InputText id="location" v-model="profile.location" :readonly="demo" class="bg-white-alpha-50" maxlength="100" />
                     </div>
                     <div class="field col-12 mb-4">
                         <label for="bio" class="font-medium text-700">Bio</label>
                         <textarea
                             id="bio"
                             v-model="profile.bio"
+                            :readonly="demo"
                             rows="4"
                             maxlength="500"
                             class="p-inputtext w-full bg-white-alpha-50"
                             style="resize: none"
                         ></textarea>
-                        <small class="text-500">{{ profile.bio.length }}/500</small>
+                        <small v-if="!demo" class="text-500">{{ profile.bio.length }}/500</small>
                     </div>
                 </div>
 
-                <div class="flex justify-content-end gap-2 mt-4">
+                <div v-if="!demo" class="flex justify-content-end gap-2 mt-4">
                     <Button label="Cancel" severity="secondary" text @click="loadProfile" />
                     <Button label="Save Changes" :loading="saving" @click="saveProfile" />
                 </div>

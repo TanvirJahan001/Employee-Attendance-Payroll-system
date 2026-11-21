@@ -7,6 +7,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebaseConfig';
 import { employeesData } from '../data/employees';
+import { demoEmployees } from '../demo/data';
 import { ATTENDANCE_STATUS } from '../constants';
 
 // ── Internal audit log writer (avoids circular import with leaveStore) ─────────
@@ -77,11 +78,7 @@ function setupEmployeeStore(demo = false) {
     const loadEmployees = async () => {
         if (employees.value.length > 0) return;   // already loaded this session
         if (demo) {
-            employees.value = employeesData.slice(0, 8).map(employee => ({
-                ...employee,
-                name: `${employee.name} (Demo)`,
-                department: employee.role,
-            }));
+            employees.value = demoEmployees.map(employee => ({ ...employee }));
             return;
         }
         loading.value = true;

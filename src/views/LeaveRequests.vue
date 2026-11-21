@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
-import { useLeaveStore, LEAVE_TYPES, LEAVE_STATUS } from '../stores/leaveStore';
+import { useLeaveStore, getLeaveTypeLabel, LEAVE_TYPES, LEAVE_STATUS } from '../stores/leaveStore';
 import { useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
+import { demoLeaveRequests } from '../demo/data';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -17,10 +18,17 @@ import Avatar from 'primevue/avatar';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 
-const leaveStore   = useLeaveStore();
-const empStore     = useEmployeeStore();
+const props        = defineProps({ demo: Boolean });
+const leaveStore   = props.demo ? null : useLeaveStore();
+const empStore     = props.demo ? null : useEmployeeStore();
 const authStore    = useAuthStore();
 const toast        = useToast();
+const sampleRequests = props.demo ? demoLeaveRequests() : [];
+const requests = computed(() => props.demo ? sampleRequests : leaveStore.requests);
+const pendingRequests = computed(() => leaveStore?.pendingRequests ?? sampleRequests.filter(request => request.status === LEAVE_STATUS.PENDING));
+const pendingCount = computed(() => pendingRequests.value.length);
+const loadingRequests = computed(() => leaveStore?.loading ?? false);
+const showAdminView = computed(() => props.demo || authStore.isAdmin);
 
 // Linked employee ID for the current logged-in user
 const myEmployeeId   = computed(() => authStore.employeeId);
@@ -28,6 +36,7 @@ const myEmployeeName = ref('');
 const loadingMe      = ref(true);
 
 onMounted(async () => {
+    if (!leaveStore) return;
     const submitterUid = authStore.isAdmin ? null : authStore.user.uid;
     const requests = leaveStore.loadRequests(submitterUid);
     if (myEmployeeId.value != null) {
@@ -70,6 +79,7 @@ const validateSubmit = () => {
 };
 
 const handleSubmit = async () => {
+    if (!leaveStore) return;
     if (!validateSubmit()) return;
     submitting.value = true;
     const result = await leaveStore.submitRequest({
@@ -103,7 +113,7 @@ const openReviewDialog = (req) => {
 };
 
 const handleReview = async (status) => {
-    if (!selectedReq.value) return;
+    if (!leaveStore || !selectedReq.value) return;
     reviewing.value = true;
     const result = await leaveStore.reviewRequest(selectedReq.value.firestoreId, status, reviewNote.value);
     reviewing.value = false;
@@ -141,7 +151,7 @@ const daysBetween = (start, end) => {
 // Filter own requests for employee tab
 const myRequests = computed(() =>
     myEmployeeId.value != null
-        ? leaveStore.requests.filter(r => r.employeeId === myEmployeeId.value)
+        ? requests.value.filter(r => r.employeeId === myEmployeeId.value)
         : []
 );
 </script>
@@ -153,14 +163,15 @@ const myRequests = computed(() =>
         <div>
             <h2 class="text-3xl font-bold text-800 mb-1">Leave Management</h2>
             <p class="text-600">
-                <span v-if="authStore.isAdmin">Review and manage employee leave requests</span>
+                <span v-if="demo">Browse sample leave requests and their statuses.</span>
+                <span v-else-if="showAdminView">Review and manage employee leave requests</span>
                 <span v-else>Submit and track your leave requests</span>
             </p>
         </div>
-        <div class="flex gap-2">
+        <div v-if="!demo" class="flex gap-2">
             <Button
-                v-if="authStore.isAdmin && leaveStore.pendingCount > 0"
-                :badge="String(leaveStore.pendingCount)"
+                v-if="showAdminView && pendingCount > 0"
+                :badge="String(pendingCount)"
                 icon="pi pi-bell"
                 label="Pending"
                 severity="warning"
@@ -172,13 +183,13 @@ const myRequests = computed(() =>
     </div>
 
     <!-- ── ADMIN: full list with tabs ───────────────────────────────────────── -->
-    <template v-if="authStore.isAdmin">
+    <template v-if="showAdminView">
         <TabView>
             <TabPanel header="All Requests">
                 <div class="card glass border-0 shadow-none mt-3">
                     <DataTable
-                        :value="leaveStore.requests"
-                        :loading="leaveStore.loading"
+                        :value="requests"
+                        :loading="loadingRequests"
                         paginator :rows="10"
                         tableStyle="min-width: 55rem"
                         rowHover
@@ -193,7 +204,7 @@ const myRequests = computed(() =>
                             </template>
                         </Column>
                         <Column header="Type">
-                            <template #body="{ data }">{{ leaveStore.getTypeLabel(data.type) }}</template>
+                            <template #body="{ data }">{{ getLeaveTypeLabel(data.type) }}</template>
                         </Column>
                         <Column header="Dates">
                             <template #body="{ data }">
@@ -215,7 +226,7 @@ const myRequests = computed(() =>
                                 />
                             </template>
                         </Column>
-                        <Column header="Actions" style="width: 8rem">
+                        <Column v-if="!demo" header="Actions" style="width: 8rem">
                             <template #body="{ data }">
                                 <Button
                                     v-if="data.status === LEAVE_STATUS.PENDING"
@@ -233,11 +244,11 @@ const myRequests = computed(() =>
                 </div>
             </TabPanel>
 
-            <TabPanel :header="`Pending (${leaveStore.pendingCount})`">
+            <TabPanel :header="`Pending (${pendingCount})`">
                 <div class="card glass border-0 shadow-none mt-3">
                     <DataTable
-                        :value="leaveStore.pendingRequests"
-                        :loading="leaveStore.loading"
+                        :value="pendingRequests"
+                        :loading="loadingRequests"
                         tableStyle="min-width: 55rem"
                         rowHover
                         :emptyMessage="'No pending requests — all caught up!'"
@@ -250,7 +261,7 @@ const myRequests = computed(() =>
                                 </div>
                             </template>
                         </Column>
-                        <Column header="Type"><template #body="{ data }">{{ leaveStore.getTypeLabel(data.type) }}</template></Column>
+                        <Column header="Type"><template #body="{ data }">{{ getLeaveTypeLabel(data.type) }}</template></Column>
                         <Column header="Dates">
                             <template #body="{ data }">
                                 <span>{{ data.startDate }} → {{ data.endDate }}</span>
@@ -262,7 +273,7 @@ const myRequests = computed(() =>
                                 <span class="text-600">{{ data.reason || '—' }}</span>
                             </template>
                         </Column>
-                        <Column header="Actions">
+                        <Column v-if="!demo" header="Actions">
                             <template #body="{ data }">
                                 <Button icon="pi pi-check" label="Review" size="small" @click="openReviewDialog(data)" />
                             </template>
@@ -278,13 +289,13 @@ const myRequests = computed(() =>
         <div class="card glass border-0 shadow-none">
             <DataTable
                 :value="myRequests"
-                :loading="leaveStore.loading || loadingMe"
+                :loading="loadingRequests || loadingMe"
                 paginator :rows="10"
                 tableStyle="min-width: 40rem"
                 rowHover
                 :emptyMessage="'No leave requests yet. Click \'Request Leave\' to submit one.'"
             >
-                <Column header="Type"><template #body="{ data }">{{ leaveStore.getTypeLabel(data.type) }}</template></Column>
+                <Column header="Type"><template #body="{ data }">{{ getLeaveTypeLabel(data.type) }}</template></Column>
                 <Column header="Dates">
                     <template #body="{ data }">
                         <span>{{ data.startDate }} → {{ data.endDate }}</span>
@@ -307,7 +318,7 @@ const myRequests = computed(() =>
     </template>
 
     <!-- ── Submit Leave Dialog ────────────────────────────────────────────────── -->
-    <Dialog v-model:visible="submitDialog" modal header="Request Leave" :style="{ width: '32rem' }" :breakpoints="{ '640px': '95vw' }">
+    <Dialog v-if="!demo" v-model:visible="submitDialog" modal header="Request Leave" :style="{ width: '32rem' }" :breakpoints="{ '640px': '95vw' }">
         <div class="grid formgrid p-fluid">
             <div class="field col-12 mb-3">
                 <label class="font-medium mb-1 block">Leave Type *</label>
@@ -337,12 +348,12 @@ const myRequests = computed(() =>
     </Dialog>
 
     <!-- ── Review Leave Dialog (admin) ───────────────────────────────────────── -->
-    <Dialog v-model:visible="reviewDialog" modal header="Review Leave Request" :style="{ width: '32rem' }" :breakpoints="{ '640px': '95vw' }">
+    <Dialog v-if="!demo" v-model:visible="reviewDialog" modal header="Review Leave Request" :style="{ width: '32rem' }" :breakpoints="{ '640px': '95vw' }">
         <template v-if="selectedReq">
             <div class="p-3 border-round surface-100 mb-4">
                 <div class="grid">
                     <div class="col-6"><span class="text-500">Employee</span><div class="font-bold">{{ selectedReq.employeeName }}</div></div>
-                    <div class="col-6"><span class="text-500">Type</span><div class="font-bold">{{ leaveStore.getTypeLabel(selectedReq.type) }}</div></div>
+                    <div class="col-6"><span class="text-500">Type</span><div class="font-bold">{{ getLeaveTypeLabel(selectedReq.type) }}</div></div>
                     <div class="col-6 mt-3"><span class="text-500">Start Date</span><div class="font-bold">{{ selectedReq.startDate }}</div></div>
                     <div class="col-6 mt-3"><span class="text-500">End Date</span><div class="font-bold">{{ selectedReq.endDate }}</div></div>
                     <div class="col-12 mt-3" v-if="selectedReq.reason"><span class="text-500">Reason</span><div class="text-700">{{ selectedReq.reason }}</div></div>

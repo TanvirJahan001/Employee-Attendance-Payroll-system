@@ -15,7 +15,8 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { useToast } from 'primevue/usetoast';
 
-const auth = getAuth();
+const props = defineProps({ demo: Boolean });
+const auth = props.demo ? null : getAuth();
 const toast = useToast();
 
 const notifications = ref({
@@ -86,6 +87,7 @@ const validatePassword = () => {
 };
 
 const submitPasswordChange = async () => {
+    if (!auth) return;
     if (!validatePassword()) return;
 
     const user = auth.currentUser;
@@ -124,6 +126,10 @@ const historyLoading = ref(false);
 
 const openLoginHistory = async () => {
     loginHistoryDialog.value = true;
+    if (props.demo) {
+        loginHistory.value = [{ date: 'Current demo session', device: 'Demo browser', status: 'Success' }];
+        return;
+    }
     const user = auth.currentUser;
     if (!user) return;
 
@@ -168,11 +174,11 @@ const saveSettings = () => {
                     <div class="grid formgrid p-fluid max-w-30rem">
                         <div class="field col-12 mb-4">
                             <label class="font-medium text-700 mb-2 block">Language</label>
-                            <Dropdown v-model="language" :options="languages" optionLabel="name" optionValue="code" class="w-full" />
+                            <Dropdown v-model="language" :disabled="demo" :options="languages" optionLabel="name" optionValue="code" class="w-full" />
                         </div>
                         <div class="field col-12 mb-4">
                             <label class="font-medium text-700 mb-2 block">Timezone</label>
-                            <Dropdown v-model="timezone" :options="timezones" class="w-full" />
+                            <Dropdown v-model="timezone" :disabled="demo" :options="timezones" class="w-full" />
                         </div>
                     </div>
                 </div>
@@ -186,14 +192,14 @@ const saveSettings = () => {
                             <div class="font-medium text-900">Weekly Report</div>
                             <div class="text-500 text-sm">Receive a summary of employee attendance</div>
                         </div>
-                        <InputSwitch v-model="notifications.email" />
+                        <InputSwitch v-model="notifications.email" :disabled="demo" />
                     </div>
                     <div class="flex align-items-center justify-content-between mb-4 p-3 surface-50 border-round">
                         <div>
                             <div class="font-medium text-900">System Updates</div>
                             <div class="text-500 text-sm">Get notified about new features</div>
                         </div>
-                        <InputSwitch v-model="notifications.updates" />
+                        <InputSwitch v-model="notifications.updates" :disabled="demo" />
                     </div>
 
                     <h4 class="mb-4 mt-5 text-800">Push Notifications</h4>
@@ -202,7 +208,7 @@ const saveSettings = () => {
                             <div class="font-medium text-900">New Leave Requests</div>
                             <div class="text-500 text-sm">Instant alert when employee requests leave</div>
                         </div>
-                        <InputSwitch v-model="notifications.push" />
+                        <InputSwitch v-model="notifications.push" :disabled="demo" />
                     </div>
                 </div>
             </TabPanel>
@@ -215,23 +221,23 @@ const saveSettings = () => {
                             <div class="font-medium text-900">Two-Factor Authentication</div>
                             <div class="text-500 text-sm">Add an extra layer of security</div>
                         </div>
-                        <InputSwitch v-model="security.twoFactor" />
+                        <InputSwitch v-model="security.twoFactor" :disabled="demo" />
                     </div>
 
                     <div class="mt-5">
-                        <Button label="Change Password" icon="pi pi-lock" severity="warning" outlined class="mr-2" @click="openChangePassword" />
+                        <Button v-if="!demo" label="Change Password" icon="pi pi-lock" severity="warning" outlined class="mr-2" @click="openChangePassword" />
                         <Button label="View Login History" icon="pi pi-history" severity="secondary" outlined @click="openLoginHistory" />
                     </div>
                 </div>
             </TabPanel>
         </TabView>
 
-        <div class="flex justify-content-end mt-4 pt-4 border-top-1 border-gray-200">
+        <div v-if="!demo" class="flex justify-content-end mt-4 pt-4 border-top-1 border-gray-200">
             <Button label="Save All Changes" icon="pi pi-check" @click="saveSettings" />
         </div>
 
         <!-- Change Password Dialog -->
-        <Dialog v-model:visible="changePasswordDialog" modal header="Change Password" :style="{ width: '25rem' }">
+        <Dialog v-if="!demo" v-model:visible="changePasswordDialog" modal header="Change Password" :style="{ width: '25rem' }">
             <div class="flex flex-column gap-3 mb-3">
                 <div class="flex flex-column gap-1">
                     <label for="current" class="font-semibold">Current Password</label>

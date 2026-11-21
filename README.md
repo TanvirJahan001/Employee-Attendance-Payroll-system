@@ -11,7 +11,9 @@ Open the [live login page](https://employee-attendance-payroll-system.vercel.app
 | Email | `demo@example.invalid` |
 | Password | `ExploreAttendance!` |
 
-The read-only demo opens the dashboard, employee directory, attendance calendar, and payroll. Search for an employee, pick a date to see sample check-in and check-out times, or download an example PDF payslip. The preview uses eight built-in sample profiles and generated attendance. The session stays in the current browser tab and is cleared when you select **Exit Demo**. The public details open only the sample workspace.
+The read-only demo uses the same sidebar, layout, and screens as the administrator workspace. Browse the dashboard, employees, attendance, check-in and check-out, leave requests, payroll, holidays, and audit log. The account menu also opens a sample profile and settings. You can search, filter, pick an attendance date, and download sample PDF payslips.
+
+All demo screens use sample records. The demo session stays in the current browser tab. Open the account menu and select **Exit Demo** to clear it. The public details grant access only to the sample workspace under `/demo`.
 
 ## Features and access
 

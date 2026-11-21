@@ -211,7 +211,7 @@ const handleForgotPassword = async () => {
 
             <section class="relative z-1 mt-5 p-3 border-1 surface-border border-round-xl" aria-labelledby="demo-title">
                 <h2 id="demo-title" class="text-lg text-900 mt-0 mb-1">Public demo</h2>
-                <p class="text-700 text-sm mt-0 mb-3">Explore the app with sample employees, attendance, and payroll.</p>
+                <p class="text-700 text-sm mt-0 mb-3">Explore the admin workspace with sample data and read-only access.</p>
                 <dl class="text-sm text-900 mt-0 mb-3">
                     <div class="flex flex-wrap gap-2 mb-2">
                         <dt class="font-semibold">Email</dt>

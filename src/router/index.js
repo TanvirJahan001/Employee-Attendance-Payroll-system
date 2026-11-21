@@ -1,6 +1,87 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { hasDemoSession } from '../demo/session';
 
+const workspaceRoutes = [
+    {
+        path: '',
+        redirect: '/dashboard'
+    },
+    {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: () => import('../views/Dashboard.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: 'employees',
+        name: 'employees',
+        component: () => import('../views/EmployeeList.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+        path: 'profile',
+        name: 'profile',
+        component: () => import('../views/Profile.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('../views/Settings.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: 'attendance',
+        name: 'attendance',
+        component: () => import('../views/Attendance.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+        path: 'payroll',
+        name: 'payroll',
+        component: () => import('../views/Payroll.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+        path: 'checkin',
+        name: 'checkin',
+        component: () => import('../views/CheckIn.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: 'leave',
+        name: 'leave',
+        component: () => import('../views/LeaveRequests.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: 'holidays',
+        name: 'holidays',
+        component: () => import('../views/Holidays.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+        path: 'audit',
+        name: 'audit',
+        component: () => import('../views/AuditLog.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true }
+    }
+];
+
+const demoPages = new Set([
+    'dashboard', 'checkin', 'leave', 'employees', 'attendance',
+    'payroll', 'holidays', 'audit', 'profile', 'settings',
+]);
+
+const demoRoutes = workspaceRoutes
+    .filter(({ name }) => demoPages.has(name))
+    .map(({ path, name, component }) => ({
+        path,
+        name: `demo-${name}`,
+        component,
+        props: { demo: true },
+    }));
+
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
@@ -8,72 +89,7 @@ const router = createRouter({
             path: '/',
             component: () => import('../layout/AppLayout.vue'),
             meta: { requiresAuth: true },
-            children: [
-                {
-                    path: '',
-                    redirect: '/dashboard'
-                },
-                {
-                    path: 'dashboard',
-                    name: 'dashboard',
-                    component: () => import('../views/Dashboard.vue'),
-                    meta: { requiresAuth: true }
-                },
-                {
-                    path: 'employees',
-                    name: 'employees',
-                    component: () => import('../views/EmployeeList.vue'),
-                    meta: { requiresAuth: true, requiresAdmin: true }
-                },
-                {
-                    path: 'profile',
-                    name: 'profile',
-                    component: () => import('../views/Profile.vue'),
-                    meta: { requiresAuth: true }
-                },
-                {
-                    path: 'settings',
-                    name: 'settings',
-                    component: () => import('../views/Settings.vue'),
-                    meta: { requiresAuth: true }
-                },
-                {
-                    path: 'attendance',
-                    name: 'attendance',
-                    component: () => import('../views/Attendance.vue'),
-                    meta: { requiresAuth: true, requiresAdmin: true }
-                },
-                {
-                    path: 'payroll',
-                    name: 'payroll',
-                    component: () => import('../views/Payroll.vue'),
-                    meta: { requiresAuth: true, requiresAdmin: true }
-                },
-                {
-                    path: 'checkin',
-                    name: 'checkin',
-                    component: () => import('../views/CheckIn.vue'),
-                    meta: { requiresAuth: true }
-                },
-                {
-                    path: 'leave',
-                    name: 'leave',
-                    component: () => import('../views/LeaveRequests.vue'),
-                    meta: { requiresAuth: true }
-                },
-                {
-                    path: 'holidays',
-                    name: 'holidays',
-                    component: () => import('../views/Holidays.vue'),
-                    meta: { requiresAuth: true, requiresAdmin: true }
-                },
-                {
-                    path: 'audit',
-                    name: 'audit',
-                    component: () => import('../views/AuditLog.vue'),
-                    meta: { requiresAuth: true, requiresAdmin: true }
-                }
-            ]
+            children: workspaceRoutes
         },
         {
             path: '/demo',
@@ -81,10 +97,7 @@ const router = createRouter({
             meta: { demo: true },
             children: [
                 { path: '', redirect: { name: 'demo-dashboard' } },
-                { path: 'dashboard', name: 'demo-dashboard', props: { demo: true }, component: () => import('../views/Dashboard.vue') },
-                { path: 'employees', name: 'demo-employees', props: { demo: true }, component: () => import('../views/EmployeeList.vue') },
-                { path: 'attendance', name: 'demo-attendance', props: { demo: true }, component: () => import('../views/Attendance.vue') },
-                { path: 'payroll', name: 'demo-payroll', props: { demo: true }, component: () => import('../views/Payroll.vue') },
+                ...demoRoutes,
             ],
         },
         {

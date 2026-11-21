@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useEmployeeStore } from '../stores/employeeStore';
+import { useDemoEmployeeStore, useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
+import { demoEmployees } from '../demo/data';
 import { ATTENDANCE_STATUS } from '../constants';
 import { useToast } from 'primevue/usetoast';
 import Button from 'primevue/button';
@@ -10,7 +11,8 @@ import Card from 'primevue/card';
 import Toast from 'primevue/toast';
 import Avatar from 'primevue/avatar';
 
-const store = useEmployeeStore();
+const props = defineProps({ demo: Boolean });
+const store = props.demo ? useDemoEmployeeStore() : useEmployeeStore();
 const authStore = useAuthStore();
 const toast = useToast();
 
@@ -20,7 +22,7 @@ let clockInterval = null;
 
 // The employee record linked to the current user's uid
 // Stored in Firestore users/{uid} as employeeId field (set by admin)
-const linkedEmployeeId = computed(() => authStore.employeeId);
+const linkedEmployeeId = computed(() => props.demo ? demoEmployees[0].id : authStore.employeeId);
 const employee = ref(null);
 const loadingEmployee = ref(true);
 const checkingIn = ref(false);
@@ -110,7 +112,7 @@ const statusLabel = computed(() => {
 
     <div class="mb-4">
         <h2 class="text-3xl font-bold text-800 mb-1">My Attendance</h2>
-        <p class="text-600">Record your daily check-in and check-out</p>
+        <p class="text-600">{{ demo ? 'View an example of employee check-in and check-out.' : 'Record your daily check-in and check-out' }}</p>
     </div>
 
     <div class="grid">
@@ -125,7 +127,7 @@ const statusLabel = computed(() => {
                 <Tag :value="statusLabel" :severity="statusSeverity" class="text-base px-4 py-2 mb-5" rounded />
 
                 <!-- Check-in / Check-out buttons -->
-                <div class="flex gap-3">
+                <div v-if="!demo" class="flex gap-3">
                     <Button
                         v-if="!isCheckedIn"
                         label="Check In"
@@ -232,7 +234,7 @@ const statusLabel = computed(() => {
                         </span>
                     </div>
 
-                    <p class="text-500 text-xs mt-4 text-center">
+                    <p v-if="!demo" class="text-500 text-xs mt-4 text-center">
                         Attendance is recorded in real-time to Firestore.
                     </p>
                 </template>

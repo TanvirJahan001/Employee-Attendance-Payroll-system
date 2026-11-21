@@ -21,6 +21,9 @@ export const LEAVE_STATUS = {
     REJECTED: 'rejected',
 };
 
+export const getLeaveTypeLabel = (value) =>
+    LEAVE_TYPES.find(type => type.value === value)?.label || value;
+
 export const useLeaveStore = defineStore('leave', () => {
 
     const requests = ref([]);   // all leave requests
@@ -199,9 +202,6 @@ export const useLeaveStore = defineStore('leave', () => {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    const getTypeLabel = (value) =>
-        LEAVE_TYPES.find(t => t.value === value)?.label || value;
-
     const $reset = () => {
         requests.value = [];
         loading.value = false;
@@ -215,7 +215,7 @@ export const useLeaveStore = defineStore('leave', () => {
         loadRequests,
         submitRequest,
         reviewRequest,
-        getTypeLabel,
+        getTypeLabel: getLeaveTypeLabel,
         writeAudit,
         $reset,
     };

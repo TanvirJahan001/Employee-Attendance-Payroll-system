@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref, reactive, computed } from 'vue';
 import { useHolidayStore } from '../stores/holidayStore';
+import { demoHolidays } from '../demo/data';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
@@ -14,11 +15,12 @@ import Tag from 'primevue/tag';
 import ConfirmDialog from 'primevue/confirmdialog';
 import Toast from 'primevue/toast';
 
-const store   = useHolidayStore();
+const props = defineProps({ demo: Boolean });
+const store   = props.demo ? null : useHolidayStore();
 const confirm = useConfirm();
 const toast   = useToast();
 
-onMounted(() => store.loadHolidays());
+onMounted(() => store?.loadHolidays());
 
 // ── Add dialog ────────────────────────────────────────────────────────────────
 const addDialog  = ref(false);
@@ -46,6 +48,7 @@ const validateAdd = () => {
 };
 
 const handleAdd = async () => {
+    if (!store) return;
     if (!validateAdd()) return;
     adding.value = true;
     const result = await store.addHoliday({ ...addForm });
@@ -59,6 +62,7 @@ const handleAdd = async () => {
 };
 
 const confirmDelete = (holiday) => {
+    if (!store) return;
     confirm.require({
         message: `Remove "${holiday.name}" from the holiday calendar?`,
         header: 'Delete Holiday',
@@ -79,6 +83,9 @@ const confirmDelete = (holiday) => {
 
 // ── Computed: group by month for a calendar-like view ─────────────────────────
 const currentYear = new Date().getFullYear();
+const sampleHolidays = props.demo ? demoHolidays(currentYear) : [];
+const holidays = computed(() => props.demo ? sampleHolidays : store.holidays);
+const loading = computed(() => store?.loading ?? false);
 
 const byMonth = computed(() => {
     const months = Array.from({ length: 12 }, (_, i) => ({
@@ -86,7 +93,7 @@ const byMonth = computed(() => {
         name: new Date(currentYear, i, 1).toLocaleString('en-US', { month: 'long' }),
         holidays: [],
     }));
-    store.holidays.forEach(h => {
+    holidays.value.forEach(h => {
         const m = new Date(h.date).getMonth();
         if (!isNaN(m)) months[m].holidays.push(h);
     });
@@ -99,40 +106,40 @@ const formatDate = (d) =>
 
 <template>
     <Toast />
-    <ConfirmDialog />
+    <ConfirmDialog v-if="!demo" />
 
     <div class="flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="text-3xl font-bold text-800 mb-1">Holiday Calendar</h2>
-            <p class="text-600">Manage company and national holidays — excluded from attendance calculations</p>
+            <p class="text-600">{{ demo ? 'Browse sample company and national holidays.' : 'Manage company and national holidays.' }}</p>
         </div>
-        <Button icon="pi pi-plus" label="Add Holiday" @click="openAddDialog" class="shadow-2" />
+        <Button v-if="!demo" icon="pi pi-plus" label="Add Holiday" @click="openAddDialog" class="shadow-2" />
     </div>
 
     <!-- Stats bar -->
     <div class="grid mb-4">
         <div class="col-12 md:col-4">
             <div class="glass p-3 border-round-xl text-center">
-                <div class="text-2xl font-bold text-primary">{{ store.holidays.length }}</div>
+                <div class="text-2xl font-bold text-primary">{{ holidays.length }}</div>
                 <div class="text-500 text-sm">Total Holidays</div>
             </div>
         </div>
         <div class="col-12 md:col-4">
             <div class="glass p-3 border-round-xl text-center">
-                <div class="text-2xl font-bold text-blue-600">{{ store.holidays.filter(h => h.type === 'national').length }}</div>
+                <div class="text-2xl font-bold text-blue-600">{{ holidays.filter(h => h.type === 'national').length }}</div>
                 <div class="text-500 text-sm">National Holidays</div>
             </div>
         </div>
         <div class="col-12 md:col-4">
             <div class="glass p-3 border-round-xl text-center">
-                <div class="text-2xl font-bold text-purple-600">{{ store.holidays.filter(h => h.type === 'company').length }}</div>
+                <div class="text-2xl font-bold text-purple-600">{{ holidays.filter(h => h.type === 'company').length }}</div>
                 <div class="text-500 text-sm">Company Holidays</div>
             </div>
         </div>
     </div>
 
     <!-- Month cards -->
-    <div class="grid mb-4" v-if="!store.loading">
+    <div class="grid mb-4" v-if="!loading">
         <div v-for="month in byMonth" :key="month.month" class="col-12 md:col-6 lg:col-4">
             <div class="glass p-4 border-round-xl h-full">
                 <h4 class="text-900 font-bold mb-3 flex align-items-center gap-2">
@@ -156,7 +163,7 @@ const formatDate = (d) =>
                                 class="text-xs"
                                 rounded
                             />
-                            <Button icon="pi pi-trash" text severity="danger" rounded size="small" @click="confirmDelete(h)" />
+                            <Button v-if="!demo" icon="pi pi-trash" text severity="danger" rounded size="small" @click="confirmDelete(h)" />
                         </div>
                     </li>
                 </ul>
@@ -164,7 +171,7 @@ const formatDate = (d) =>
         </div>
     </div>
 
-    <div v-if="store.loading" class="text-center py-8">
+    <div v-if="loading" class="text-center py-8">
         <i class="pi pi-spin pi-spinner text-4xl text-primary mb-3 block"></i>
         <p class="text-500">Loading holidays…</p>
     </div>
@@ -172,7 +179,7 @@ const formatDate = (d) =>
     <!-- Full list table -->
     <div class="card glass border-0 shadow-none">
         <h4 class="font-bold text-800 mb-3">All Holidays</h4>
-        <DataTable :value="store.holidays" :loading="store.loading" paginator :rows="10" tableStyle="min-width:35rem" rowHover sortField="date" :sortOrder="1">
+        <DataTable :value="holidays" :loading="loading" paginator :rows="10" tableStyle="min-width:35rem" rowHover sortField="date" :sortOrder="1">
             <Column field="date" header="Date" sortable>
                 <template #body="{ data }">
                     <span class="font-mono">{{ data.date }}</span>
@@ -190,7 +197,7 @@ const formatDate = (d) =>
                     <i :class="data.recurring ? 'pi pi-check text-green-500' : 'pi pi-minus text-400'" />
                 </template>
             </Column>
-            <Column header="Actions" style="width: 5rem">
+            <Column v-if="!demo" header="Actions" style="width: 5rem">
                 <template #body="{ data }">
                     <Button icon="pi pi-trash" text severity="danger" rounded size="small" @click="confirmDelete(data)" />
                 </template>
@@ -199,7 +206,7 @@ const formatDate = (d) =>
     </div>
 
     <!-- ── Add Holiday Dialog ──────────────────────────────────────────────── -->
-    <Dialog v-model:visible="addDialog" modal header="Add Holiday" :style="{ width: '28rem' }" :breakpoints="{ '640px': '95vw' }">
+    <Dialog v-if="!demo" v-model:visible="addDialog" modal header="Add Holiday" :style="{ width: '28rem' }" :breakpoints="{ '640px': '95vw' }">
         <div class="grid formgrid p-fluid">
             <div class="field col-12 mb-3">
                 <label class="font-medium mb-1 block">Holiday Name *</label>
