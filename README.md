@@ -72,6 +72,14 @@ Follow these steps to set up the project locally.
     npm run build
     ```
 
+### Daily demo attendance
+
+The demo dataset uses eight employee profiles labeled **(Demo)** and tagged with `demoDataset: daily-attendance-v1`. The scheduled job adds the day's sample attendance and fills in checkout times for past days. It only works with those demo profiles and preserves existing attendance entries and administrator edits.
+
+The **Daily demo attendance** GitHub Actions workflow is scheduled for 9:17 a.m. Asia/Dhaka. It requires the deployed Firestore rules and the dedicated Firebase Authentication user with UID `demo-attendance-scheduler`. The workflow reads the `DEMO_FIREBASE_PROJECT_ID` repository variable and the `DEMO_FIREBASE_WEB_API_KEY`, `DEMO_SYNC_EMAIL`, and `DEMO_SYNC_PASSWORD` Actions secrets.
+
+You can also run it from **Actions → Daily demo attendance → Run workflow**. GitHub may disable scheduled workflows on public repositories after 60 days without repository activity. [GitHub Actions scheduling](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+
 ## 📂 Project Structure
 
 ```

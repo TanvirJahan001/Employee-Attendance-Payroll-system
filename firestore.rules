@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && currentProfile().get('role', 'employee') == 'admin';
+    }
+
+    function ownsEmployee(employeeId) {
+      return signedIn() && employeeId is int
+        && currentProfile().get('employeeId', null) == employeeId;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isDemoSync() {
+      return isOwner('demo-attendance-scheduler');
+    }
+
+    function isDemoEmployeeDocument(documentId) {
+      return documentId.matches('10[1-8]');
+    }
+
+    function isDemoDataset(data) {
+      return data.get('demoDataset', '') == 'daily-attendance-v1';
+    }
+
+    function isDemoAttendancePath(documentId) {
+      return documentId.matches('10[1-8]_[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && isDemoDataset(get(/databases/$(database)/documents/employees/$(documentId.split('_')[0])).data);
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['role', 'createdAt'])
+        && request.resource.data.role == 'employee'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['phone', 'location', 'bio', 'avatarUrl']);
+
+      match /loginHistory/{entryId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && request.resource.data.timestamp == request.time
+          && request.resource.data.success == true
+          && request.resource.data.userAgent is string
+          && request.resource.data.userAgent.size() <= 200;
+      }
+    }
+
+    match /employees/{documentId} {
+      allow get: if isAdmin() || ownsEmployee(resource.data.id);
+      allow get: if isDemoSync() && isDemoEmployeeDocument(documentId)
+        && (resource == null || isDemoDataset(resource.data));
+      allow list, write: if isAdmin();
+    }
+
+    function isTime(value) {
+      return value is string && value.matches('([01][0-9]|2[0-3]):[0-5][0-9]');
+    }
+
+    match /attendance/{documentId} {
+      allow read: if isAdmin() || ownsEmployee(resource.data.employeeId);
+      allow get: if isDemoSync() && isDemoAttendancePath(documentId);
+      allow create: if isDemoSync() && isDemoAttendancePath(documentId)
+        && validDemoAttendance(documentId, request.resource.data);
+      allow update: if isDemoSync() && isDemoAttendancePath(documentId)
+        && isDemoDataset(resource.data)
+        && resource.data.recordedBy == request.auth.uid
+        && resource.data.status == 'Present'
+        && resource.data.outTime == null
+        && isTime(request.resource.data.outTime)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outTime', 'updatedAt']);
+      allow create: if isAdmin() || (
+        ownsEmployee(request.resource.data.employeeId)
+        && request.resource.data.keys().hasOnly([
+          'employeeId', 'date', 'status', 'inTime', 'outTime', 'recordedBy', 'updatedAt'
+        ])
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && documentId == string(request.resource.data.employeeId) + '_' + request.resource.data.date
+        && request.resource.data.status == 'Present'
+        && isTime(request.resource.data.inTime)
+        && request.resource.data.outTime == null
+        && request.resource.data.recordedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time
+      );
+      allow update: if isAdmin() || (
+        ownsEmployee(resource.data.employeeId)
+        && resource.data.status == 'Present'
+        && isTime(resource.data.inTime)
+        && resource.data.outTime == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outTime', 'updatedAt'])
+        && isTime(request.resource.data.outTime)
+        && request.resource.data.updatedAt == request.time
+      );
+      allow delete: if isAdmin();
+    }
+
+    function validDemoAttendance(documentId, data) {
+      return data.keys().hasOnly([
+          'employeeId', 'date', 'status', 'inTime', 'outTime', 'recordedBy', 'updatedAt', 'demoDataset'
+        ])
+        && data.employeeId is int
+        && documentId == string(data.employeeId) + '_' + data.date
+        && isDemoDataset(data)
+        && data.recordedBy == request.auth.uid
+        && data.updatedAt == request.time
+        && (
+          (data.status == 'Present' && isTime(data.inTime) && (data.outTime == null || isTime(data.outTime)))
+          || (data.status in ['Absent', 'Leave'] && data.inTime == null && data.outTime == null)
+        );
+    }
+
+    match /leaveRequests/{requestId} {
+      allow read: if isAdmin() || isOwner(resource.data.submittedBy);
+      allow create: if ownsEmployee(request.resource.data.employeeId)
+        && isOwner(request.resource.data.submittedBy)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.submittedAt == request.time
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.reviewNote == '';
+      allow update: if isAdmin();
+    }
+
+    match /holidays/{holidayId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /auditLog/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.performedBy == request.auth.uid
+        && request.resource.data.timestamp == request.time;
+    }
+  }
+}

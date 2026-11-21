@@ -1,0 +1,28 @@
+name: Daily demo attendance
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-demo-attendance
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Sync demo attendance to Firestore
+        run: node scripts/sync-demo-attendance.js
+        env:
+          DEMO_FIREBASE_PROJECT_ID: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}
+          DEMO_FIREBASE_WEB_API_KEY: ${{ secrets.DEMO_FIREBASE_WEB_API_KEY }}
+          DEMO_SYNC_EMAIL: ${{ secrets.DEMO_SYNC_EMAIL }}
+          DEMO_SYNC_PASSWORD: ${{ secrets.DEMO_SYNC_PASSWORD }}
