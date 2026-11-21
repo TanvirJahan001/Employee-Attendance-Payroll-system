@@ -1,9 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { jsPDF } from 'jspdf';
-import { useEmployeeStore } from '../stores/employeeStore';
-import { useAuthStore } from '../stores/authStore';
-import { useLeaveStore } from '../stores/leaveStore';
+import { useDemoEmployeeStore, useEmployeeStore } from '../stores/employeeStore';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../firebaseConfig';
@@ -15,9 +13,8 @@ import Avatar from 'primevue/avatar';
 import Button from 'primevue/button';
 import Toast from 'primevue/toast';
 
-const store     = useEmployeeStore();
-const authStore = useAuthStore();
-const leaveStore = useLeaveStore();
+const props = defineProps({ demo: Boolean });
+const store     = props.demo ? useDemoEmployeeStore() : useEmployeeStore();
 const toast     = useToast();
 const generatingAll = ref(false);
 
@@ -52,7 +49,7 @@ const generatePayslip = (employee) => {
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(22);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('PAYSLIP', pad, 38);
+    pdf.text(props.demo ? 'SAMPLE PAYSLIP' : 'PAYSLIP', pad, 38);
 
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'normal');
@@ -176,14 +173,15 @@ const generatePayslip = (employee) => {
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('This is a system-generated payslip. For queries contact HR.', W / 2, footY + 16, { align: 'center' });
+    const footer = props.demo ? 'Public demo with sample data.' : 'This is a system-generated payslip. For queries contact HR.';
+    pdf.text(footer, W / 2, footY + 16, { align: 'center' });
     pdf.text(`Employee Attendance & Payroll System  ·  ${month}`, W / 2, footY + 30, { align: 'center' });
 
     // Save
     pdf.save(`Payslip_${employee.name.replace(/\s+/g, '_')}_${month.replace(/\s+/g, '_')}.pdf`);
 
     // Write audit log
-    writePayrollAudit(employee.name, month);
+    if (!props.demo) writePayrollAudit(employee.name, month);
 };
 
 // ── Generate all payslips ─────────────────────────────────────────────────────

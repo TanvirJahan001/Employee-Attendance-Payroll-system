@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useToast } from "primevue/usetoast";
 import { useAuthStore } from '../stores/authStore';
+import { DEMO_EMAIL, DEMO_PASSWORD, startDemoSession } from '../demo/session';
 import Toast from 'primevue/toast';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -53,13 +54,26 @@ const validate = () => {
     return valid;
 };
 
+const openDemo = () => {
+    startDemoSession();
+    return router.push({ name: 'demo-dashboard' });
+};
+
 const handleLogin = async () => {
+    if (loading.value) return;
     loginError.value = '';
     if (!validate()) return;
 
+    const loginEmail = email.value.trim();
+    if (loginEmail.toLowerCase() === DEMO_EMAIL) {
+        if (password.value === DEMO_PASSWORD) return openDemo();
+        loginError.value = 'Invalid demo password. Use the password shown below.';
+        return;
+    }
+
     loading.value = true;
     try {
-        const credential = await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
+        const credential = await signInWithEmailAndPassword(auth, loginEmail, password.value);
         await authStore.recordLoginEvent(credential.user.uid, true);
         router.push('/dashboard');
     } catch (error) {
@@ -98,6 +112,10 @@ const handleForgotPassword = async () => {
         forgotEmailError.value = 'Enter a valid email address.';
         return;
     }
+    if (forgotEmail.value.trim().toLowerCase() === DEMO_EMAIL) {
+        forgotEmailError.value = 'Use the public password shown in the demo section.';
+        return;
+    }
 
     forgotLoading.value = true;
     try {
@@ -125,7 +143,7 @@ const handleForgotPassword = async () => {
 </script>
 
 <template>
-    <div class="flex align-items-center justify-content-center min-h-screen">
+    <div class="flex align-items-center justify-content-center min-h-screen p-3">
         <Toast />
 
         <div class="glass p-4 md:p-6 w-full max-w-30rem border-round-2xl relative overflow-hidden">
@@ -160,7 +178,7 @@ const handleForgotPassword = async () => {
                     <span class="p-input-icon-left w-full">
                         <i class="pi pi-lock text-600 z-2"></i>
                         <Password
-                            id="password"
+                            inputId="password"
                             v-model="password"
                             placeholder="Enter your password"
                             :feedback="false"
@@ -190,6 +208,23 @@ const handleForgotPassword = async () => {
                     </a>
                 </div>
             </form>
+
+            <section class="relative z-1 mt-5 p-3 border-1 surface-border border-round-xl" aria-labelledby="demo-title">
+                <h2 id="demo-title" class="text-lg text-900 mt-0 mb-1">Public demo</h2>
+                <p class="text-700 text-sm mt-0 mb-3">Explore the app with sample employees, attendance, and payroll.</p>
+                <dl class="text-sm text-900 mt-0 mb-3">
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        <dt class="font-semibold">Email</dt>
+                        <dd class="m-0"><code>{{ DEMO_EMAIL }}</code></dd>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <dt class="font-semibold">Password</dt>
+                        <dd class="m-0"><code>{{ DEMO_PASSWORD }}</code></dd>
+                    </div>
+                </dl>
+                <Button label="Try Demo" icon="pi pi-arrow-right" iconPos="right" type="button" class="w-full"
+                    severity="secondary" :disabled="loading" @click="openDemo" />
+            </section>
         </div>
 
         <!-- ── Forgot Password Dialog ───────────────────────────────────────── -->

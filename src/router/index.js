@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { hasDemoSession } from '../demo/session';
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -75,6 +76,18 @@ const router = createRouter({
             ]
         },
         {
+            path: '/demo',
+            component: () => import('../layout/DemoLayout.vue'),
+            meta: { demo: true },
+            children: [
+                { path: '', redirect: { name: 'demo-dashboard' } },
+                { path: 'dashboard', name: 'demo-dashboard', props: { demo: true }, component: () => import('../views/Dashboard.vue') },
+                { path: 'employees', name: 'demo-employees', props: { demo: true }, component: () => import('../views/EmployeeList.vue') },
+                { path: 'attendance', name: 'demo-attendance', props: { demo: true }, component: () => import('../views/Attendance.vue') },
+                { path: 'payroll', name: 'demo-payroll', props: { demo: true }, component: () => import('../views/Payroll.vue') },
+            ],
+        },
+        {
             path: '/login',
             name: 'login',
             component: () => import('../views/Login.vue')
@@ -92,6 +105,8 @@ const router = createRouter({
 // onAuthStateChanged listener. Waits for the initial auth check to complete.
 
 router.beforeEach(async (to, from, next) => {
+    if (to.meta.demo) return hasDemoSession() ? next() : next({ name: 'login' });
+
     const requiresAuth  = to.matched.some(r => r.meta.requiresAuth);
     const requiresAdmin = to.matched.some(r => r.meta.requiresAdmin);
 

@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref, reactive } from 'vue';
-import { useEmployeeStore } from '../stores/employeeStore';
+import { useDemoEmployeeStore, useEmployeeStore } from '../stores/employeeStore';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -16,7 +16,8 @@ import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import Toast from 'primevue/toast';
 
-const store = useEmployeeStore();
+const props = defineProps({ demo: Boolean });
+const store = props.demo ? useDemoEmployeeStore() : useEmployeeStore();
 const toast = useToast();
 const confirm = useConfirm();
 
@@ -169,14 +170,14 @@ const getSalaryDetails = (employee) => {
     <div class="flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="text-3xl font-bold text-800 mb-1">Employee Management</h2>
-            <p class="text-600">Manage employee information and track their performance</p>
+            <p class="text-600">{{ demo ? 'Browse sample employee profiles, salaries, and absences.' : 'Manage employee information and track their performance' }}</p>
         </div>
-        <Button icon="pi pi-plus" label="Add Employee" @click="openAddDialog" class="shadow-2" />
+        <Button v-if="!demo" icon="pi pi-plus" label="Add Employee" @click="openAddDialog" class="shadow-2" />
     </div>
 
     <div class="card glass border-0 shadow-none">
         <Toast />
-        <ConfirmDialog />
+        <ConfirmDialog v-if="!demo" />
 
         <div class="overflow-x-auto">
             <DataTable
@@ -228,7 +229,7 @@ const getSalaryDetails = (employee) => {
                     </template>
                 </Column>
 
-                <Column header="Actions" style="width: 14rem">
+                <Column v-if="!demo" header="Actions" style="width: 14rem">
                     <template #body="slotProps">
                         <div class="flex gap-1 flex-wrap">
                             <Button
@@ -266,6 +267,7 @@ const getSalaryDetails = (employee) => {
 
         <!-- ── Mark Leave Dialog ───────────────────────────────────────────── -->
         <Dialog
+            v-if="!demo"
             v-model:visible="leaveDialogVisible"
             modal
             header="Mark Leave"
@@ -284,6 +286,7 @@ const getSalaryDetails = (employee) => {
 
         <!-- ── Add / Edit Employee Dialog ────────────────────────────────────── -->
         <Dialog
+            v-if="!demo"
             v-model:visible="empDialogVisible"
             modal
             :header="empDialogMode === 'add' ? 'Add New Employee' : 'Edit Employee'"

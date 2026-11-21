@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
-import { useEmployeeStore } from '../stores/employeeStore';
+import { useDemoEmployeeStore, useEmployeeStore } from '../stores/employeeStore';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Calendar from 'primevue/calendar';
@@ -10,7 +10,8 @@ import Avatar from 'primevue/avatar';
 import Toast from 'primevue/toast';
 import { useToast } from 'primevue/usetoast';
 
-const store = useEmployeeStore();
+const props = defineProps({ demo: Boolean });
+const store = props.demo ? useDemoEmployeeStore() : useEmployeeStore();
 const toast = useToast();
 const selectedDate = ref(new Date());
 const loadingAttendance = ref(false);
@@ -52,11 +53,11 @@ const handleMarkLeave = async (employee) => {
     <div class="flex flex-column md:flex-row justify-content-between align-items-start md:align-items-center mb-4 gap-3">
         <div>
             <h2 class="text-3xl font-bold text-800 mb-1">Attendance</h2>
-            <p class="text-600">Track daily employee attendance — real-time from Firestore</p>
+            <p class="text-600">{{ demo ? 'Browse sample check-in and check-out records by date.' : 'Track daily employee attendance from Firestore.' }}</p>
         </div>
-        <div class="flex align-items-center gap-3 w-full md:w-auto">
-            <label class="font-medium text-700 white-space-nowrap">Select Date:</label>
-            <Calendar v-model="selectedDate" dateFormat="dd/mm/yy" showIcon class="w-full md:w-16rem" :maxDate="new Date()" />
+        <div class="flex flex-column sm:flex-row sm:align-items-center gap-2 w-full md:w-auto">
+            <label for="attendance-date" class="font-medium text-700 white-space-nowrap">Select Date:</label>
+            <Calendar v-model="selectedDate" inputId="attendance-date" dateFormat="dd/mm/yy" showIcon class="w-full md:w-16rem" :maxDate="new Date()" />
         </div>
     </div>
 
@@ -121,7 +122,7 @@ const handleMarkLeave = async (employee) => {
                     </template>
                 </Column>
 
-                <Column header="Actions">
+                <Column v-if="!demo" header="Actions">
                     <template #body="slotProps">
                         <Button
                             v-if="getRecord(slotProps.data).status === 'Absent'"

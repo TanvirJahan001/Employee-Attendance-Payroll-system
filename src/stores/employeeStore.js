@@ -39,9 +39,22 @@ const toDateKey = (date = new Date()) => {
 /** Attendance document id: "<employeeId>_<YYYY-MM-DD>" */
 const attendanceDocId = (employeeId, dateKey) => `${employeeId}_${dateKey}`;
 
+const demoAttendance = (employeeId, dateKey) => {
+    const day = Number(dateKey.slice(-2));
+    const roll = (employeeId * 7 + day * (employeeId % 3 + 1)) % 19;
+    if (roll < 2) return { status: ATTENDANCE_STATUS.ABSENT, inTime: null, outTime: null };
+    if (roll < 4) return { status: ATTENDANCE_STATUS.LEAVE, inTime: null, outTime: null };
+
+    return {
+        status: ATTENDANCE_STATUS.PRESENT,
+        inTime: `08:${30 + (employeeId * 3 + day) % 30}`,
+        outTime: dateKey === toDateKey() ? null : `17:${String((employeeId * 5 + day) % 60).padStart(2, '0')}`,
+    };
+};
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useEmployeeStore = defineStore('employee', () => {
+function setupEmployeeStore(demo = false) {
     const employees = ref([]);        // Array<{id,name,role,baseSalary,email,phone,department,...}>
     const attendance = ref({});       // { "<empId>_<dateKey>": {status,inTime,outTime} }
     const loading = ref(false);
@@ -63,6 +76,14 @@ export const useEmployeeStore = defineStore('employee', () => {
 
     const loadEmployees = async () => {
         if (employees.value.length > 0) return;   // already loaded this session
+        if (demo) {
+            employees.value = employeesData.slice(0, 8).map(employee => ({
+                ...employee,
+                name: `${employee.name} (Demo)`,
+                department: employee.role,
+            }));
+            return;
+        }
         loading.value = true;
         try {
             const snap = await getDocs(collection(db, 'employees'));
@@ -110,6 +131,10 @@ export const useEmployeeStore = defineStore('employee', () => {
     const generateEmployees = loadEmployees;
 
     const loadEmployee = async (employeeId) => {
+        if (demo) {
+            await loadEmployees();
+            return employees.value.find(employee => employee.id === employeeId) ?? null;
+        }
         try {
             const snap = await getDoc(doc(db, 'employees', String(employeeId)));
             return snap.exists() ? snap.data() : null;
@@ -122,6 +147,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── Firestore: load attendance for a specific date ────────────────────────
 
     const loadAttendanceForDate = async (dateKey, employeeId = null) => {
+        if (demo) return;
         try {
             const filters = [where('date', '==', dateKey)];
             if (employeeId != null) filters.push(where('employeeId', '==', employeeId));
@@ -144,6 +170,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     /** Get attendance record for an employee on a given date.
      *  Falls back to 'Absent' so the UI always has something to show. */
     const getAttendance = (employeeId, dateKey) => {
+        if (demo) return demoAttendance(employeeId, dateKey);
         const key = attendanceDocId(employeeId, dateKey);
         return attendance.value[key] || { status: ATTENDANCE_STATUS.ABSENT, inTime: null, outTime: null };
     };
@@ -151,6 +178,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── Firestore: check-in / check-out ───────────────────────────────────────
 
     const checkIn = async (employeeId, dateKey = toDateKey()) => {
+        if (demo) return { success: false, error: 'Demo data is read-only' };
         const auth = getAuth();
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -183,6 +211,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     };
 
     const checkOut = async (employeeId, dateKey = toDateKey()) => {
+        if (demo) return { success: false, error: 'Demo data is read-only' };
         const auth = getAuth();
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -213,6 +242,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── Firestore: mark leave ─────────────────────────────────────────────────
 
     const markLeave = async (employeeId, dateOrDay) => {
+        if (demo) return;
         const { useAuthStore } = await import('./authStore');
         const { getActivePinia } = await import('pinia');
         const pinia = getActivePinia();
@@ -256,6 +286,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── CRUD: Add Employee ────────────────────────────────────────────────────
 
     const addEmployee = async (empData) => {
+        if (demo) return { success: false, error: 'Demo data is read-only' };
         const auth = getAuth();
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -291,6 +322,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── CRUD: Update Employee ─────────────────────────────────────────────────
 
     const updateEmployee = async (employeeId, updates) => {
+        if (demo) return { success: false, error: 'Demo data is read-only' };
         const auth = getAuth();
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -323,6 +355,7 @@ export const useEmployeeStore = defineStore('employee', () => {
     // ── CRUD: Delete Employee ─────────────────────────────────────────────────
 
     const deleteEmployee = async (employeeId) => {
+        if (demo) return { success: false, error: 'Demo data is read-only' };
         const auth = getAuth();
         if (!auth.currentUser) return { success: false, error: 'Not authenticated' };
 
@@ -347,8 +380,7 @@ export const useEmployeeStore = defineStore('employee', () => {
 
         for (let d = 1; d <= daysInMonth; d++) {
             const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            const rec = attendance.value[attendanceDocId(employee.id, dateKey)];
-            if (!rec || rec.status === ATTENDANCE_STATUS.ABSENT) {
+            if (getAttendance(employee.id, dateKey).status === ATTENDANCE_STATUS.ABSENT) {
                 absentDays++;
             }
         }
@@ -409,4 +441,7 @@ export const useEmployeeStore = defineStore('employee', () => {
         toDateKey,
         $reset,
     };
-});
+}
+
+export const useEmployeeStore = defineStore('employee', () => setupEmployeeStore());
+export const useDemoEmployeeStore = defineStore('demoEmployee', () => setupEmployeeStore(true));

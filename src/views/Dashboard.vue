@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, computed, ref } from 'vue';
-import { useEmployeeStore } from '../stores/employeeStore';
+import { useDemoEmployeeStore, useEmployeeStore } from '../stores/employeeStore';
 import { useAuthStore } from '../stores/authStore';
 import { ATTENDANCE_STATUS } from '../constants';
 import Card from 'primevue/card';
@@ -8,13 +8,15 @@ import Chart from 'primevue/chart';
 import Avatar from 'primevue/avatar';
 import Tag from 'primevue/tag';
 
-const store = useEmployeeStore();
+const props = defineProps({ demo: Boolean });
+const store = props.demo ? useDemoEmployeeStore() : useEmployeeStore();
 const authStore = useAuthStore();
+const showOverview = computed(() => props.demo || authStore.isAdmin);
 const todayKey = store.toDateKey(new Date());
 const ownAttendance = computed(() => store.getAttendance(authStore.employeeId, todayKey));
 
 onMounted(async () => {
-    if (authStore.isAdmin) {
+    if (showOverview.value) {
         await Promise.all([store.loadEmployees(), store.loadAttendanceForDate(todayKey)]);
     } else if (authStore.employeeId != null) {
         await store.loadAttendanceForDate(todayKey, authStore.employeeId);
@@ -68,7 +70,7 @@ const chartOptions = ref({
 </script>
 
 <template>
-    <div v-if="authStore.isAdmin" class="grid">
+    <div v-if="showOverview" class="grid">
         <!-- KPI cards -->
         <div class="col-12 lg:col-4 animation-duration-500 animation-ease-out fadeinup">
             <Card class="mb-0">
